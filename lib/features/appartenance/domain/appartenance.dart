@@ -1,31 +1,31 @@
 import 'package:json_annotation/json_annotation.dart';
+import '../users/domain/user.dart';
 import '../materiel/domain/materiel.dart';
-import '../bureau/domain/bureau.dart';
 
-part 'localisation.g.dart';
+part 'appartenance.g.dart';
 
 @JsonSerializable()
-class Localisation {
+class Appartenance {
   final int? id;
+  final int idUser;
   final int idMateriel;
-  final int idBureau;
   final DateTime dateDebut;
   final DateTime? dateFin;
+  final User? user;
   final Materiel? materiel;
-  final Bureau? bureau;
 
-  const Localisation({
+  const Appartenance({
     this.id,
+    required this.idUser,
     required this.idMateriel,
-    required this.idBureau,
     required this.dateDebut,
     this.dateFin,
+    this.user,
     this.materiel,
-    this.bureau,
   });
 
-  factory Localisation.fromJson(Map<String, dynamic> json) =>
-      _$LocalisationFromJson(json);
+  factory Appartenance.fromJson(Map<String, dynamic> json) =>
+      _$AppartenanceFromJson(json);
 
-  Map<String, dynamic> toJson() => _$LocalisationToJson(this);
+  Map<String, dynamic> toJson() => _$AppartenanceToJson(this);
 }
