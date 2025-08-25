@@ -1,5 +1,3 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-import '../config/app_config.dart';
 import '../sevices/supabase_client.dart';
 
 class SupabaseService {
@@ -78,6 +76,27 @@ class SupabaseService {
     }
   }
   
+  // Méthode pour rechercher avec des conditions OR sur plusieurs colonnes (ilike)
+  static Future<List<Map<String, dynamic>>> searchOr(
+    String table, {
+    required Map<String, String> conditions,
+  }) async {
+    try {
+      if (conditions.isEmpty) {
+        return getAll(table);
+      }
+      final orFragments = conditions.entries
+          .map((entry) => "${entry.key}.ilike.%${entry.value}%")
+          .join(',');
+      final response = await SupabaseClientService.from(table)
+          .select()
+          .or(orFragments);
+      return List<Map<String, dynamic>>.from(response);
+    } catch (e) {
+      throw Exception('Erreur lors de la recherche OR: $e');
+    }
+  }
+  
   // Méthode pour paginer les résultats
   static Future<List<Map<String, dynamic>>> getPaginated(
     String table, 
@@ -99,8 +118,10 @@ class SupabaseService {
   // Méthode pour obtenir le nombre total d'enregistrements
   static Future<int> getCount(String table) async {
     try {
-      final response = await SupabaseClientService.from(table).select('id', const FetchOptions(count: CountOption.exact));
-      return response.count ?? 0;
+      // Note: SDK count meta may vary by version; fallback to simple length of ids
+      final response = await SupabaseClientService.from(table)
+          .select('id');
+      return (response as List).length;
     } catch (e) {
       throw Exception('Erreur lors du comptage: $e');
     }
