@@ -1,8 +1,4 @@
-import 'package:json_annotation/json_annotation.dart';
 
-part 'departement.g.dart';
-
-@JsonSerializable()
 class Departement {
   final int? id;
   final String nom;
@@ -12,8 +8,27 @@ class Departement {
     required this.nom,
   });
 
-  factory Departement.fromJson(Map<String, dynamic> json) =>
-      _$DepartementFromJson(json);
+  factory Departement.fromMap(Map<String, dynamic> map) {
+    return Departement(
+      id: map['id'] as int?,
+      nom: map['nom'] as String? ?? '',
+    );
+  }
 
-  Map<String, dynamic> toJson() => _$DepartementToJson(this);
-} 
+  Map<String, dynamic> toMap() {
+    return <String, dynamic>{
+      if (id != null) 'id': id,
+      'nom': nom,
+    };
+  }
+
+  Departement copyWith({
+    int? id,
+    String? nom,
+  }) {
+    return Departement(
+      id: id ?? this.id,
+      nom: nom ?? this.nom,
+    );
+  }
+}

@@ -5,12 +5,12 @@ import '../../../../core/enums/app_enums.dart';
 class MaterielMapper {
   /// Convertit un Map en entité Materiel
   static Materiel fromMap(Map<String, dynamic> map) {
-    return Materiel.fromJson(map);
+    return Materiel.fromMap(map);
   }
 
   /// Convertit une entité Materiel en Map
   static Map<String, dynamic> toMap(Materiel materiel) {
-    return materiel.toJson();
+    return materiel.toMap();
   }
 
   /// Convertit une liste de Maps en liste d'entités Materiel

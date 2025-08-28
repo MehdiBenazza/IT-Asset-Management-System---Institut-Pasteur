@@ -33,7 +33,7 @@ class SupabaseClientService {
   }
   
   // Méthode pour obtenir le token d'accès
-  static String? get accessToken => currentUser?.accessToken;
+  static String? get accessToken => client.auth.currentSession?.accessToken;
   
   // Méthode pour écouter les changements d'authentification
   static Stream<AuthState> get authStateChanges => client.auth.onAuthStateChange;
@@ -44,7 +44,7 @@ class SupabaseClientService {
   }
   
   // Méthode pour exécuter des requêtes RPC (Remote Procedure Call)
-  static SupabaseQueryBuilder rpc(String function, {Map<String, dynamic>? params}) {
+  static PostgrestFilterBuilder<dynamic> rpc(String function, {Map<String, dynamic>? params}) {
     return client.rpc(function, params: params);
   }
   

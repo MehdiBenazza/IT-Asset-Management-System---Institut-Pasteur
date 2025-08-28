@@ -1,4 +1,5 @@
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/sevices/supabase_client.dart';
 import '../../domain/materiel.dart';
 
 abstract class MaterielRemoteDataSource {
@@ -12,9 +13,56 @@ abstract class MaterielRemoteDataSource {
   Future<List<Materiel>> getMaterielsByType(String type);
   Future<int> getMaterielsCount();
   Future<List<Materiel>> getMaterielsPaginated({int page = 1, int limit = 20});
+  Future<List<Materiel>> getMaterielsByUser(int userId);
+  Future<List<Materiel>> getMaterielsByBureau(int bureauId);
+  Future<List<Materiel>> getMaterielsByDepartement(int departementId);
 }
 
 class MaterielRemoteDataSourceImpl implements MaterielRemoteDataSource {
+  @override
+  Future<List<Materiel>> getMaterielsByUser(int userId) async {
+    // Assuming a relation table 'appartenance' with 'id_user' and 'id_materiel'
+    final response = await SupabaseService.search('appartenance', 'id_user', userId.toString());
+    final materielIds = response.map((e) => e['id_materiel'] as int).toList();
+    if (materielIds.isEmpty) return [];
+    final materielData = await SupabaseClientService.from(_tableName)
+      .select()
+      .inFilter('id', materielIds);
+    return List<Map<String, dynamic>>.from(materielData)
+      .map((json) => Materiel.fromMap(json)).toList();
+  }
+
+  @override
+  Future<List<Materiel>> getMaterielsByBureau(int bureauId) async {
+    // Assuming a relation table 'localisation' with 'id_bureau' and 'id_materiel'
+    final response = await SupabaseService.search('localisation', 'id_bureau', bureauId.toString());
+    final materielIds = response.map((e) => e['id_materiel'] as int).toList();
+    if (materielIds.isEmpty) return [];
+    final materielData = await SupabaseClientService.from(_tableName)
+      .select()
+      .inFilter('id', materielIds);
+    return List<Map<String, dynamic>>.from(materielData)
+      .map((json) => Materiel.fromMap(json)).toList();
+  }
+
+  @override
+  Future<List<Materiel>> getMaterielsByDepartement(int departementId) async {
+    // Assuming a relation: bureau has id_departement, localisation links materiel to bureau
+    final bureaux = await SupabaseService.search('bureau', 'id_departement', departementId.toString());
+    final bureauIds = bureaux.map((e) => e['id'] as int).toList();
+    if (bureauIds.isEmpty) return [];
+    final localisations = await SupabaseClientService.from('localisation')
+      .select()
+      .inFilter('id_bureau', bureauIds);
+    final materielIds = List<Map<String, dynamic>>.from(localisations)
+      .map((e) => e['id_materiel'] as int).toList();
+    if (materielIds.isEmpty) return [];
+    final materielData = await SupabaseClientService.from(_tableName)
+      .select()
+      .inFilter('id', materielIds);
+    return List<Map<String, dynamic>>.from(materielData)
+      .map((json) => Materiel.fromMap(json)).toList();
+  }
   static const String _tableName = 'materiel';
 
   @override
