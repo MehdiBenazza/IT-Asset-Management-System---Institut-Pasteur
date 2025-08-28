@@ -1,4 +1,3 @@
-import '../../../core/exceptions.dart';
 import '../../domain/bureau.dart';
 import '../datasources/bureau_remote_datasource.dart';
 

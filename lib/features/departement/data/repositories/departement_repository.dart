@@ -1,4 +1,3 @@
-import '../../../core/exceptions.dart';
 import '../../domain/departement.dart';
 import '../datasources/departement_remote_datasource.dart';
 
@@ -17,52 +16,27 @@ class DepartementRepositoryImpl implements DepartementRepository {
 			: _remoteDataSource = remoteDataSource ?? DepartementRemoteDataSourceImpl();
 
 	@override
-		Future<List<Departement>> getAllDepartements() async {
-			try {
+			Future<List<Departement>> getAllDepartements() async {
 				return await _remoteDataSource.getAllDepartements();
-			} catch (e, stack) {
-				print('Erreur getAllDepartements: $e\n$stack');
-				throw DataRepositoryException('Erreur lors de la récupération des départements');
 			}
-		}
 
 	@override
-		Future<Departement?> getDepartementById(int id) async {
-			try {
+			Future<Departement?> getDepartementById(int id) async {
 				return await _remoteDataSource.getDepartementById(id);
-			} catch (e, stack) {
-				print('Erreur getDepartementById: $e\n$stack');
-				throw DataRepositoryException('Erreur lors de la récupération du département');
 			}
-		}
 
 	@override
-		Future<Departement> createDepartement(Departement departement) async {
-			try {
+			Future<Departement> createDepartement(Departement departement) async {
 				return await _remoteDataSource.createDepartement(departement);
-			} catch (e, stack) {
-				print('Erreur createDepartement: $e\n$stack');
-				throw DataRepositoryException('Erreur lors de la création du département');
 			}
-		}
 
 	@override
-		Future<Departement> updateDepartement(int id, Departement departement) async {
-			try {
+			Future<Departement> updateDepartement(int id, Departement departement) async {
 				return await _remoteDataSource.updateDepartement(id, departement);
-			} catch (e, stack) {
-				print('Erreur updateDepartement: $e\n$stack');
-				throw DataRepositoryException('Erreur lors de la mise à jour du département');
 			}
-		}
 
 	@override
-		Future<void> deleteDepartement(int id) async {
-			try {
+			Future<void> deleteDepartement(int id) async {
 				await _remoteDataSource.deleteDepartement(id);
-			} catch (e, stack) {
-				print('Erreur deleteDepartement: $e\n$stack');
-				throw DataRepositoryException('Erreur lors de la suppression du département');
 			}
-		}
 }
