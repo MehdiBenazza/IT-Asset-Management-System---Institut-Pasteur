@@ -1,7 +1,7 @@
 
 import '../../domain/user.dart';
 import '../datasources/user_remote_datasource.dart';
-import '../../../../core/exceptions.dart';
+import '../../../../core/errors/exceptions.dart';
 
 abstract class UserRepository {
 	Future<List<User>> getAllUsers();
