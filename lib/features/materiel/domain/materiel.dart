@@ -6,6 +6,7 @@ class Materiel {
   final String? modele;
   final EtatMaterielEnum etat;
   final DateTime? dateExpirationGarantie;
+  final String? os;
 
   const Materiel({
     this.id,
@@ -13,6 +14,7 @@ class Materiel {
     this.modele,
     this.etat = EtatMaterielEnum.actif,
     this.dateExpirationGarantie,
+    this.os
   });
 
   factory Materiel.fromMap(Map<String, dynamic> map) {
@@ -37,6 +39,7 @@ class Materiel {
       'modele': modele,
       'etat': etat.name,
       'date_expiration_garantie': dateExpirationGarantie?.toIso8601String(),
+      'os': os,
     };
   }
 
@@ -53,6 +56,7 @@ class Materiel {
       modele: modele ?? this.modele,
       etat: etat ?? this.etat,
       dateExpirationGarantie: dateExpirationGarantie ?? this.dateExpirationGarantie,
+      os: os ?? this.os,
     );
   }
 

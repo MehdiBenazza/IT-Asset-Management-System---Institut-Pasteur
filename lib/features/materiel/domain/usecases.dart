@@ -181,4 +181,16 @@ class GetMaterielsPaginatedUseCase {
   Future<List<Materiel>> call({int page = 1, int limit = 20}) async {
     return await _materielUseCases.getMaterielsPaginated(page: page, limit: limit);
   }
+
+// Use Case spécifique pour récupérer les matériels par département
+class GetMaterielsByDepartementUseCase {
+  final MaterielUseCases _materielUseCases;
+
+  GetMaterielsByDepartementUseCase(this._materielUseCases);
+
+  Future<List<Materiel>> call(String departement) async {
+    return await _materielUseCases.getMaterielsByDepartement(departement);
+  }
 }
+
+

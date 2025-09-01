@@ -1,109 +1,9 @@
-// lib/main.dart
-// Flutter Web dashboard with role-based privileges (Feddi / Department / User)
-// Drop into your Flutter project as lib/main.dart
-// ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'features/auth/presentation/login_screen.dart';
-import 'features/materiel/data/domain/materiel.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import '../../../core/models/models.dart';
 
-
-void main() {
-  runApp(const App());
-}
-
-class App extends StatelessWidget {
-  const App({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Dashboard',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: false, fontFamily: 'Arial'),
-      home: const LoginScreen(),
-    );
-  }
-}
-
-//
-// ============== LOGIN SCREEN ==============
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
-  @override
-  State<LoginScreen> createState() => _LoginScreenState();
-}
-
-class _LoginScreenState extends State<LoginScreen> {
-  final emailController = TextEditingController();
-  final passwordController = TextEditingController();
-  String error = "";
-
-  void _login() {
-    final email = emailController.text.trim().toLowerCase();
-    final password = passwordController.text.trim();
-
-    if (password != "00000") {
-      setState(() => error = "Incorrect password");
-      return;
-    }
-
-    // Decide role by email (demo)
-    String title;
-    if (email == 'feddi@gmail.com') {
-      title = 'Fedi Dashboard';
-    } else if (email == 'departement@gmail.com') {
-      title = 'Departement Dashboard';
-    } else {
-      title = 'User Dashboard';
-    }
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => DashboardScreen(title: title, loggedInEmail: email)),
-    );
-  }
-
-  @override
-  void dispose() {
-    emailController.dispose();
-    passwordController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          width: 380,
-          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(15)),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text("Login", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 18),
-              TextField(controller: emailController, decoration: const InputDecoration(labelText: "Email")),
-              const SizedBox(height: 10),
-              TextField(controller: passwordController, decoration: const InputDecoration(labelText: "Password"), obscureText: true),
-              const SizedBox(height: 16),
-              ElevatedButton(onPressed: _login, child: const SizedBox(width: double.infinity, child: Center(child: Text("Login")))),
-              if (error.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(error, style: const TextStyle(color: Colors.red))),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-
-
-//
-// ============== DASHBOARD SCREEN ==============
-enum Menu { home, notifications, profile, report, antiviruses, database, addEmployee, createMaterial, manageDepartments, logout }
+enum Menu { home, profile, report, antiviruses, database, addEmployee, createMaterial, manageDepartments, logout }
 
 class DashboardScreen extends StatefulWidget {
   final String title;
@@ -128,18 +28,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // Demo in-memory DB
   final List<Materiel> materials = [
-    Materiel(id: 'LT-2023-0456', type: 'Laptop', userId: 'U001', state: 'working', os: 'Windows 11 Pro', departement: 'IT'),
-    Materiel(id: 'DT-2022-0789', type: 'Desktop', userId: 'U002', state: 'not working', os: 'Windows 10 Pro', departement: 'Finance'),
+    Materiel(id: 1, type: 'Laptop', modele: 'Dell', etat: EtatMaterielEnum.actif),
+    Materiel(id: 2, type: 'Desktop', modele: 'HP', etat: EtatMaterielEnum.enPanne),
   ];
 
   final List<User> employees = [
-    User(id: '001', nom: 'Dupont', prenom: 'Jean', dateNaissance: '1993-04-02', dateRecrutement: '2021-06-12', email: 'jean.dupont@example.com', departement: 'IT'),
-    User(id: '002', nom: 'Martin', prenom: 'Alice', dateNaissance: '1990-09-10', dateRecrutement: '2020-01-05', email: 'alice.martin@example.com', departement: 'Finance'),
+    User(id: 1, nom: 'Dupont', prenom: 'Jean', email: 'jean.dupont@example.com', role: RoleEnum.employe, actif: true),
+    User(id: 2, nom: 'Martin', prenom: 'Alice', email: 'alice.martin@example.com', role: RoleEnum.employe, actif: true),
   ];
 
   final List<Departement> departments = [
-    Departement(id: '001', nom: 'IT'),
-    Departement(id: '002', nom: 'Finance'),
+    Departement(id: 1, nom: 'IT'),
+    Departement(id: 2, nom: 'Finance'),
   ];
 
   // Feddi maintenance accepted items
@@ -198,12 +98,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (isDepartementUser) return 'IT'; // demo mapping: departement@gmail.com => IT
     // If normal user has mapping to employee id with department, you could return that employee's department
     final mapped = _employeeByEmail(widget.loggedInEmail);
-    if (mapped != null) return mapped.department;
+    if (mapped != null) return mapped.bureau?.departement?.nom ?? '';
     return '';
   }
 
   // find employee by email
-  EmployeeItem? _employeeByEmail(String email) {
+  User? _employeeByEmail(String email) {
     try {
       return employees.firstWhere((e) => e.email.toLowerCase() == email.toLowerCase());
     } catch (_) {
@@ -212,25 +112,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   // Permission checks
-  bool canEditEmployee(EmployeeItem e) {
+  bool canEditEmployee(User e) {
     if (isFeddi) return true; // feddi can edit all
     if (isDepartementUser) {
-      return e.department == currentUserDepartment; // can edit employees within own department
+      return e.bureau?.departement?.nom == currentUserDepartment; // can edit employees within own department
     }
     return false;
   }
 
-  bool canRemoveEmployee(EmployeeItem e) {
+  bool canRemoveEmployee(User e) {
     return canEditEmployee(e);
   }
 
-  bool canEditMaterial(MaterialItem m) {
+  bool canEditMaterial(Materiel m) {
     if (isFeddi) return true;
-    if (isDepartementUser) return m.department == currentUserDepartment;
+    if (isDepartementUser) return m.getBureauByMateriel()?.departement?.nom == currentUserDepartment;
     return false;
   }
 
-  bool canRemoveMaterial(MaterialItem m) {
+  bool canRemoveMaterial(Materiel m) {
     return canEditMaterial(m);
   }
 
@@ -279,7 +179,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         onPressed: () => setState(() => isMenuOpen = !isMenuOpen),
                       ),
                     ),
-                    IconButton(onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen())), icon: const Icon(Icons.logout, color: Colors.white)),
+                    IconButton(onPressed: () { /* TODO: Implement logout. The LoginScreen is not defined. */ }, icon: const Icon(Icons.logout, color: Colors.white)),
                   ]),
                 ),
                 const SizedBox(height: 8)
@@ -312,7 +212,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   List<Widget> _buildMenuItemsForRole() {
     final common = <Widget>[
       _menuItem(icon: Icons.home, label: 'Home', value: Menu.home),
-      _menuItem(icon: Icons.notifications, label: 'Notifications', value: Menu.notifications),
       _menuItem(icon: Icons.person, label: 'Profile', value: Menu.profile),
     ];
 
@@ -351,8 +250,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     switch (selected) {
       case Menu.home:
         return _roleHome();
-      case Menu.notifications:
-        return _roleNotifications();
       case Menu.profile:
         return _cardWrapper(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _sectionTitle('Personal info'),
@@ -414,12 +311,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           );
         });
-      case Menu.notifications:
-        return _cardWrapper(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _sectionTitle('Notifications'),
-          const SizedBox(height: 8),
-          for (var n in notifications) if (n.employeeName.isNotEmpty) _deptNotifTile(n) else _notifTile(n.title, n.time)
-        ]));
       case Menu.profile:
         final sampleUserId = _emailToSampleUserId(widget.loggedInEmail);
         return _cardWrapper(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -428,7 +319,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 20),
           _sectionTitle('Assigned Materials'),
           const SizedBox(height: 8),
-          for (var m in materials.where((x) => x.userId == sampleUserId)) _materialItem(deviceType: m.type, deviceId: m.id, marque: m.os, os: m.state),
+          for (var m in materials.where((x) => x. User.id == sampleUserId)) _materialItem(deviceType: m.type, deviceId: m.id, marque: m.os, os: m.state),
         ]));
       case Menu.report:
         return _cardWrapper(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -483,7 +374,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
                   _statCard('Employees', employees.length.toString()),
                   _statCard('Materials', materials.length.toString()),
-                  _statCard('Pending', notifications.where((n) => n.title.contains('Maintenance')).length.toString()),
                 ]),
               ]),
             ),
@@ -501,62 +391,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       child: Column(children: [Text(title, style: const TextStyle(fontWeight: FontWeight.w600)), const SizedBox(height: 8), Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))]),
     );
   }
-
-  // ---------------- Notifications ----------------
-  Widget _roleNotifications() {
-    return _cardWrapper(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _sectionTitle('Notifications'),
-      const SizedBox(height: 8),
-      for (var n in notifications) if (n.employeeName.isNotEmpty) _deptNotifTile(n) else _notifTile(n.title, n.time),
-      const SizedBox(height: 12),
-      if (isFeddi) Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _sectionTitle('Feddi Maintenance Actions'),
-        const SizedBox(height: 8),
-        for (var m in feeddiMaintenance) _feddiActionTile(m),
-      ]),
-    ]));
-  }
-
-  Widget _deptNotifTile(NotificationItem n) {
-  return Container(
-    margin: const EdgeInsets.only(top: 8),
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFE6E6E6)), borderRadius: BorderRadius.circular(8)),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [const Icon(Icons.report_problem, color: Colors.black54), const SizedBox(width: 8), Expanded(child: Text('${n.title} — ${n.time}', style: const TextStyle(color: textOutside, fontWeight: FontWeight.w600)))]),
-      const SizedBox(height: 8),
-      Text('Employee: ${n.employeeName}', style: const TextStyle(color: textInside)),
-      Text('Device ID: ${n.deviceId}', style: const TextStyle(color: textInside)),
-      Text('Device Type: ${n.deviceType}', style: const TextStyle(color: textInside)),
-      Text('Problem: ${n.problem}', style: const TextStyle(color: textInside)),
-      if (n.department.isNotEmpty) Text('Department: ${n.department}', style: const TextStyle(color: textInside)),
-      const SizedBox(height: 8),
-      Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-        ElevatedButton(
-            onPressed: () async {
-              // intentionally does nothing when Accept is pressed
-            },
-            child: const Text('Accept')),
-        const SizedBox(width: 8),
-        ElevatedButton(
-            onPressed: () {
-              final rej = NotificationItem(
-                title: 'Maintenance Request Rejected',
-                details: 'Your request was rejected',
-                time: DateTime.now().toIso8601String(),
-                employeeName: n.employeeName,
-                department: n.department,
-              );
-              notifications.add(rej);
-              notifications.remove(n);
-              setState(() {});
-            },
-            child: const Text('Reject')),
-      ])
-    ]),
-  );
-}
-
 
   Widget _feddiActionTile(Map<String, String> m) {
     final take = m['takeDate'] ?? '';
@@ -629,7 +463,7 @@ Widget _databaseView() {
 
           // Group by department
           for (var dept in departments) ...[
-            Text('Department: ${dept.name}',
+            Text('Department: ${dept.nom}',
                 style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
 
@@ -637,7 +471,7 @@ Widget _databaseView() {
             const Text('Materials',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             for (var m in materials.where((m) =>
-                m.department == dept.name && _matchesFilter(m))) _materialRowAdmin(m),
+                m.department == dept.nom && _matchesFilter(m))) _materialRowAdmin(m),
 
             const SizedBox(height: 12),
 
@@ -645,7 +479,7 @@ Widget _databaseView() {
             const Text('Employees',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             for (var e in employees.where((e) =>
-                e.department == dept.name && _matchesFilter(e))) _employeeRowAdmin(e),
+                e.department == dept.nom && _matchesFilter(e))) _employeeRowAdmin(e),
 
             const Divider(thickness: 1),
           ],
@@ -888,14 +722,14 @@ bool _matchesFilter(dynamic item) {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFE6E6E6)), borderRadius: BorderRadius.circular(8)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('Department: ${d.name}', style: const TextStyle(fontWeight: FontWeight.w700)),
+            Text('Department: ${d.nom}', style: const TextStyle(fontWeight: FontWeight.w700)),
             if (d.description.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(d.description)),
             const SizedBox(height: 8),
             _sectionTitle('Employees'),
-            for (var e in employees.where((ev) => ev.department == d.name)) Padding(padding: const EdgeInsets.only(top: 6), child: Text('${e.userId} — ${e.nom} ${e.prenom}')),
+            for (var e in employees.where((ev) => ev.department == d.nom)) Padding(padding: const EdgeInsets.only(top: 6), child: Text('${e.userId} — ${e.nom} ${e.prenom}')),
             const SizedBox(height: 8),
             _sectionTitle('Materials'),
-            for (var m in materials.where((mv) => mv.department == d.name)) Padding(padding: const EdgeInsets.only(top: 6), child: Text('${m.id} — ${m.type} (${m.state})')),
+            for (var m in materials.where((mv) => mv.department == d.nom)) Padding(padding: const EdgeInsets.only(top: 6), child: Text('${m.id} — ${m.type} (${m.state})')),
           ]),
         )
     ]);
@@ -1069,7 +903,7 @@ bool _matchesFilter(dynamic item) {
                 return;
               }
               setState(() {
-                departments.add(DepartmentItem(id: id, name: name, description: _deptDescController.text.trim()));
+                departments.add(DepartmentItem(id: id, nom: name, description: _deptDescController.text.trim()));
                 _deptIdController.clear();
                 _deptNameController.clear();
                 _deptDescController.clear();
@@ -1087,12 +921,12 @@ bool _matchesFilter(dynamic item) {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFE6E6E6)), borderRadius: BorderRadius.circular(8)),
             child: Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${d.id} — ${d.name}', style: const TextStyle(fontWeight: FontWeight.w700)), if (d.description.isNotEmpty) Text(d.description)])),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${d.id} — ${d.nom}', style: const TextStyle(fontWeight: FontWeight.w700)), if (d.description.isNotEmpty) Text(d.description)])),
               Column(children: [
                 ElevatedButton(
                   onPressed: () {
                     _deptIdController.text = d.id;
-                    _deptNameController.text = d.name;
+                    _deptNameController.text = d.nom;
                     _deptDescController.text = d.description;
                     showDialog(
                       context: context,
@@ -1112,7 +946,7 @@ bool _matchesFilter(dynamic item) {
                               onPressed: () {
                                 setState(() {
                                   d.id = _deptIdController.text.trim();
-                                  d.name = _deptNameController.text.trim();
+                                  d.nom = _deptNameController.text.trim();
                                   d.description = _deptDescController.text.trim();
                                 });
                                 Navigator.pop(context);
@@ -1131,10 +965,10 @@ bool _matchesFilter(dynamic item) {
                       departments.remove(d);
                       // clear references
                       for (var m in materials) {
-                        if (m.department == d.name) m.department = '';
+                        if (m.department == d.nom) m.department = '';
                       }
                       for (var e in employees) {
-                        if (e.department == d.name) e.department = '';
+                        if (e.department == d.nom) e.department = '';
                       }
                     });
                   },
@@ -1265,15 +1099,6 @@ bool _matchesFilter(dynamic item) {
       TextField(maxLines: maxLines, decoration: InputDecoration(filled: true, fillColor: Colors.white, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12), border: OutlineInputBorder(borderRadius: BorderRadius.circular(8))), style: const TextStyle(color: textInside)),
     ]);
   }
-
-  Widget _notifTile(String title, String time) {
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFE6E6E6)), borderRadius: BorderRadius.circular(8)),
-      child: Row(children: [const Icon(Icons.notifications, color: Colors.black54), const SizedBox(width: 12), Expanded(child: Text(title, style: const TextStyle(color: textOutside, fontWeight: FontWeight.w500))), Text(time, style: const TextStyle(color: Colors.black54))]),
-    );
-      }
 
   Widget _linkTile(String label, String url) {
     return InkWell(onTap: () => _openWebUrl(url), child: Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Row(children: [const Icon(Icons.link, color: Colors.black87), const SizedBox(width: 10), Expanded(child: Text(label, style: const TextStyle(color: Colors.blue, decoration: TextDecoration.underline, fontWeight: FontWeight.w600)))])));
