@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../presentation/dashboard_screen.dart'; // Corrigez le chemin d'importation ici
+import '../../../main.dart'; // Import depuis main.dart où DashboardScreen est défini
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});

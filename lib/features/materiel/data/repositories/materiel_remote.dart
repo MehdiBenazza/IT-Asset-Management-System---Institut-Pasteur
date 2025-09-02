@@ -1,5 +1,5 @@
 import '../../domain/materiel.dart';
-import '../../domain/bureau.dart';
+import '../../../bureau/domain/bureau.dart';
 import 'materiel_mapper.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -66,16 +66,20 @@ class MaterielRemoteDataSource {
 
   // Récupère le bureau associé à un matériel donné (idMateriel)
   Future<Bureau?> getBureauByMateriel(int idMateriel) async {
-    // Exemple d'implémentation avec Supabase
-    final response = await supabaseClient
-        .from('localisations')
-        .select('bureau(*)')
-        .eq('idMateriel', idMateriel)
-        .single();
-    if (response == null) return null;
-    if (response['bureau'] != null) {
-      return Bureau.fromMap(response['bureau'] as Map<String, dynamic>);
+    try {
+      final response = await supabaseClient
+          .from('localisations')
+          .select('bureau(*)')
+          .eq('idMateriel', idMateriel)
+          .single();
+      
+      if (response['bureau'] != null) {
+        return Bureau.fromMap(response['bureau'] as Map<String, dynamic>);
+      }
+      return null;
+    } catch (e) {
+      // Si aucun enregistrement trouvé ou autre erreur
+      return null;
     }
-    return null;
   }
 }

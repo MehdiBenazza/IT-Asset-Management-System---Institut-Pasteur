@@ -5,9 +5,102 @@
 import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'features/auth/presentation/login_screen.dart';
-import 'features/materiel/data/domain/materiel.dart';
+import 'package:it_asset_management_system/core/models/models.dart';
+import 'package:it_asset_management_system/features/auth/presentation/login_screen.dart';
 
+
+// Classes de données pour la démo
+class NotificationItem {
+  final String title;
+  final String details;
+  final String time;
+  final String employeeName;
+  final String deviceId;
+  final String deviceType;
+  final String problem;
+  final String department;
+
+  NotificationItem({
+    required this.title,
+    required this.details,
+    required this.time,
+    this.employeeName = '',
+    this.deviceId = '',
+    this.deviceType = '',
+    this.problem = '',
+    this.department = '',
+  });
+}
+
+// Classes de données pour la démo
+class MaterialItem {
+  String id;
+  String type;
+  String userId;
+  String state;
+  String os;
+  String department;
+
+  MaterialItem({
+    required this.id,
+    required this.type,
+    this.userId = '',
+    required this.state,
+    this.os = '',
+    this.department = '',
+  });
+}
+
+class EmployeeItem {
+  String userId;
+  String nom;
+  String prenom;
+  String dateNaissance;
+  String dateRecrutement;
+  String email;
+  String department;
+
+  EmployeeItem({
+    required this.userId,
+    required this.nom,
+    required this.prenom,
+    required this.dateNaissance,
+    required this.dateRecrutement,
+    required this.email,
+    this.department = '',
+  });
+}
+
+class DepartmentItem {
+  String id;
+  String name;
+  String description;
+
+  DepartmentItem({
+    required this.id,
+    required this.name,
+    this.description = '',
+  });
+}
+
+// Données de démonstration
+final List<NotificationItem> notifications = [
+  NotificationItem(
+    title: 'Maintenance Request',
+    details: 'New maintenance request submitted',
+    time: '2024-01-15 10:30',
+    employeeName: 'Jean Dupont',
+    deviceId: 'LT-2023-0456',
+    deviceType: 'Laptop',
+    problem: 'Screen not working',
+    department: 'IT',
+  ),
+  NotificationItem(
+    title: 'System Update',
+    details: 'System maintenance scheduled',
+    time: '2024-01-14 15:45',
+  ),
+];
 
 void main() {
   runApp(const App());
@@ -127,19 +220,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   static const Color textInside = Color(0xFF404040);
 
   // Demo in-memory DB
-  final List<Materiel> materials = [
-    Materiel(id: 'LT-2023-0456', type: 'Laptop', userId: 'U001', state: 'working', os: 'Windows 11 Pro', departement: 'IT'),
-    Materiel(id: 'DT-2022-0789', type: 'Desktop', userId: 'U002', state: 'not working', os: 'Windows 10 Pro', departement: 'Finance'),
+  final List<MaterialItem> materials = [
+    MaterialItem(id: 'LT-2023-0456', type: 'Laptop', userId: 'U001', state: 'working', os: 'Windows 11 Pro', department: 'IT'),
+    MaterialItem(id: 'DT-2022-0789', type: 'Desktop', userId: 'U002', state: 'not working', os: 'Windows 10 Pro', department: 'Finance'),
   ];
 
-  final List<User> employees = [
-    User(id: '001', nom: 'Dupont', prenom: 'Jean', dateNaissance: '1993-04-02', dateRecrutement: '2021-06-12', email: 'jean.dupont@example.com', departement: 'IT'),
-    User(id: '002', nom: 'Martin', prenom: 'Alice', dateNaissance: '1990-09-10', dateRecrutement: '2020-01-05', email: 'alice.martin@example.com', departement: 'Finance'),
+  final List<EmployeeItem> employees = [
+    EmployeeItem(userId: '001', nom: 'Dupont', prenom: 'Jean', dateNaissance: '1993-04-02', dateRecrutement: '2021-06-12', email: 'jean.dupont@example.com', department: 'IT'),
+    EmployeeItem(userId: '002', nom: 'Martin', prenom: 'Alice', dateNaissance: '1990-09-10', dateRecrutement: '2020-01-05', email: 'alice.martin@example.com', department: 'Finance'),
   ];
 
-  final List<Departement> departments = [
-    Departement(id: '001', nom: 'IT'),
-    Departement(id: '002', nom: 'Finance'),
+  final List<DepartmentItem> departments = [
+    DepartmentItem(id: '001', name: 'IT'),
+    DepartmentItem(id: '002', name: 'Finance'),
   ];
 
   // Feddi maintenance accepted items

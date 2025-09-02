@@ -42,61 +42,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
     Departement(id: 2, nom: 'Finance'),
   ];
 
-  // Feddi maintenance accepted items
-  final List<Map<String, String>> feeddiMaintenance = [];
-
-  // Controllers
-  final _matIdController = TextEditingController();
-  final _matTypeController = TextEditingController();
-  final _matUserIdController = TextEditingController();
-  final _matStateController = TextEditingController();
-  final _matOsController = TextEditingController();
-  final _matDepartmentController = TextEditingController();
-
-  final _empUserIdController = TextEditingController();
-  final _empNomController = TextEditingController();
-  final _empPrenomController = TextEditingController();
-  final _empEmailController = TextEditingController();
-  final _empDateNaissanceController = TextEditingController();
-  final _empDateRecrutementController = TextEditingController();
-  final _empDepartmentController = TextEditingController();
-
-  final _deptIdController = TextEditingController();
-  final _deptNameController = TextEditingController();
-  final _deptDescController = TextEditingController();
-
-  @override
-  void dispose() {
-    _matIdController.dispose();
-    _matTypeController.dispose();
-    _matUserIdController.dispose();
-    _matStateController.dispose();
-    _matOsController.dispose();
-    _matDepartmentController.dispose();
-
-    _empUserIdController.dispose();
-    _empNomController.dispose();
-    _empPrenomController.dispose();
-    _empEmailController.dispose();
-    _empDateNaissanceController.dispose();
-    _empDateRecrutementController.dispose();
-    _empDepartmentController.dispose();
-
-    _deptIdController.dispose();
-    _deptNameController.dispose();
-    _deptDescController.dispose();
-    super.dispose();
-  }
-
   // Role helpers
   bool get isFeddi => widget.loggedInEmail == 'feddi@gmail.com';
   bool get isDepartementUser => widget.loggedInEmail == 'departement@gmail.com';
   bool get isNormalUser => !isFeddi && !isDepartementUser;
 
-  // For the demo, map the department user email to a department name. Replace with real mapping in production.
+  // For the demo, map the department user email to a department name
   String get currentUserDepartment {
     if (isDepartementUser) return 'IT'; // demo mapping: departement@gmail.com => IT
-    // If normal user has mapping to employee id with department, you could return that employee's department
     final mapped = _employeeByEmail(widget.loggedInEmail);
     if (mapped != null) return mapped.bureau?.departement?.nom ?? '';
     return '';
@@ -126,7 +79,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   bool canEditMaterial(Materiel m) {
     if (isFeddi) return true;
-    if (isDepartementUser) return m.getBureauByMateriel()?.departement?.nom == currentUserDepartment;
+    // Pour les matériels, on ne peut pas déterminer le département directement
+    // Il faudrait utiliser une relation via localisation ou appartenance
+    if (isDepartementUser) return false; // Temporairement désactivé
     return false;
   }
 
@@ -139,7 +94,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   bool canCreateReport() {
-    // Department user and normal user can create reports. Feddi can view but not necessarily submit (keep open — we won't block)
     return !isFeddi; // per your earlier rules, depart & normal can create reports; feddi typically doesn't
   }
 
@@ -179,7 +133,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         onPressed: () => setState(() => isMenuOpen = !isMenuOpen),
                       ),
                     ),
-                    IconButton(onPressed: () { /* TODO: Implement logout. The LoginScreen is not defined. */ }, icon: const Icon(Icons.logout, color: Colors.white)),
+                    IconButton(onPressed: () { /* TODO: Implement logout */ }, icon: const Icon(Icons.logout, color: Colors.white)),
                   ]),
                 ),
                 const SizedBox(height: 8)
@@ -256,7 +210,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _personalInfoForRole(),
         ]));
       case Menu.report:
-        // shown for normal & department users
         return _cardWrapper(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           _sectionTitle('Create Report'),
           const SizedBox(height: 12),
@@ -319,7 +272,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(height: 20),
           _sectionTitle('Assigned Materials'),
           const SizedBox(height: 8),
-          for (var m in materials.where((x) => x. User.id == sampleUserId)) _materialItem(deviceType: m.type, deviceId: m.id, marque: m.os, os: m.state),
+          for (var m in materials.where((x) => x.id.toString() == sampleUserId)) 
+            _materialItem(deviceType: m.type, deviceId: m.id?.toString() ?? '', marque: m.modele ?? '', os: m.etat.name),
         ]));
       case Menu.report:
         return _cardWrapper(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -392,160 +346,57 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _feddiActionTile(Map<String, String> m) {
-    final take = m['takeDate'] ?? '';
-    final ret = m['returnDate'] ?? '';
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFE6E6E6)), borderRadius: BorderRadius.circular(8)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text('Feddi Maintenance for ${m['employee'] ?? ''} — ${m['deviceId'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.w700)),
-        const SizedBox(height: 8),
-        Text('Problem: ${m['problem'] ?? ''}'),
-        if ((m['department'] ?? '').isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Department: ${m['department']!}')),
-        const SizedBox(height: 8),
-        Row(children: [
-          Expanded(child: TextFormField(initialValue: take, decoration: const InputDecoration(labelText: 'Take Date (YYYY-MM-DD)'), onChanged: (v) => m['takeDate'] = v)),
-          const SizedBox(width: 8),
-          Expanded(child: TextFormField(initialValue: ret, decoration: const InputDecoration(labelText: 'Return Date (YYYY-MM-DD)'), onChanged: (v) => m['returnDate'] = v)),
+  // ---------------- Database view ----------------
+  Widget _databaseView() {
+    // For Feddi: show all materials and employees
+    if (isFeddi) {
+      return _cardWrapper(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _sectionTitle('Data Base (Feddi — full access)'),
+            const SizedBox(height: 12),
+            _sectionTitle('Materials'),
+            const SizedBox(height: 8),
+            for (var m in materials) _materialRowAdmin(m),
+            const SizedBox(height: 12),
+            _sectionTitle('Employees'),
+            const SizedBox(height: 8),
+            for (var e in employees) _employeeRowAdmin(e),
+          ],
+        ),
+      );
+    }
+
+    // Department user: show materials and employees
+    if (isDepartementUser) {
+      final dept = currentUserDepartment;
+      return _cardWrapper(
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          _sectionTitle('Data Base (Department: $dept)'),
+          const SizedBox(height: 12),
+          _sectionTitle('Materials'),
+          const SizedBox(height: 8),
+          for (var m in materials) _materialRowAdmin(m),
+          const SizedBox(height: 12),
+          _sectionTitle('Employees'),
+          const SizedBox(height: 8),
+          for (var e in employees) _employeeRowAdmin(e),
         ]),
+      );
+    }
+
+    // Normal user: show departments overview
+    return _cardWrapper(
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        _sectionTitle('Departments Overview'),
         const SizedBox(height: 8),
-        Align(alignment: Alignment.centerRight, child: ElevatedButton(onPressed: () => setState(() {}), child: const Text('Save'))),
+        _departmentOverview(),
       ]),
     );
   }
 
-// ---------------- Database view ----------------
-Widget _databaseView() {
-  // For Feddi: grouped by department with filter
-  if (isFeddi) {
-    return _cardWrapper(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _sectionTitle('Data Base (Feddi — full access)'),
-          const SizedBox(height: 12),
-
-          // Filter dropdown
-          Row(
-            children: [
-              const Text("Filter by:", style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(width: 10),
-              DropdownButton<String>(
-                value: _currentFilter,
-                items: const [
-                  DropdownMenuItem(value: 'all', child: Text("All")),
-                  DropdownMenuItem(value: 'type', child: Text("Material Type")),
-                  DropdownMenuItem(value: 'os', child: Text("OS")),
-                  DropdownMenuItem(value: 'department', child: Text("Department")),
-                ],
-                onChanged: (val) {
-                  setState(() => _currentFilter = val ?? 'all');
-                },
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: TextField(
-                  controller: _filterController,
-                  decoration: const InputDecoration(
-                    hintText: 'Enter filter value',
-                    border: OutlineInputBorder(),
-                    isDense: true,
-                  ),
-                  onChanged: (_) => setState(() {}),
-                ),
-              )
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // Group by department
-          for (var dept in departments) ...[
-            Text('Department: ${dept.nom}',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-
-            // Materials
-            const Text('Materials',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            for (var m in materials.where((m) =>
-                m.department == dept.nom && _matchesFilter(m))) _materialRowAdmin(m),
-
-            const SizedBox(height: 12),
-
-            // Employees
-            const Text('Employees',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-            for (var e in employees.where((e) =>
-                e.department == dept.nom && _matchesFilter(e))) _employeeRowAdmin(e),
-
-            const Divider(thickness: 1),
-          ],
-        ],
-      ),
-    );
-  }
-
-  // Department user: unchanged
-  if (isDepartementUser) {
-    final dept = currentUserDepartment;
-    return _cardWrapper(
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _sectionTitle('Data Base (Department: $dept)'),
-      const SizedBox(height: 12),
-      _sectionTitle('Materials (this department only)'),
-      const SizedBox(height: 8),
-      for (var m in materials.where((mv) => mv.department == dept)) _materialRowAdmin(m),
-      const SizedBox(height: 12),
-      _sectionTitle('Employees (this department only)'),
-      const SizedBox(height: 8),
-      for (var e in employees.where((ev) => ev.department == dept)) _employeeRowAdmin(e),
-    ]));
-  }
-
-  // Normal user: unchanged
-  return _cardWrapper(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-    _sectionTitle('Departments Overview'),
-    const SizedBox(height: 8),
-    _departmentOverview(),
-  ]));
-}
-
-// --- helpers for filtering ---
-String _currentFilter = 'all';
-final _filterController = TextEditingController();
-
-bool _matchesFilter(dynamic item) {
-  final query = _filterController.text.trim().toLowerCase();
-  if (query.isEmpty || _currentFilter == 'all') return true;
-
-  if (item is MaterialItem) {
-    switch (_currentFilter) {
-      case 'type':
-        return item.type.toLowerCase().contains(query);
-      case 'os':
-        return item.os.toLowerCase().contains(query);
-      case 'department':
-        return item.department.toLowerCase().contains(query);
-    }
-  } else if (item is EmployeeItem) {
-    switch (_currentFilter) {
-      case 'department':
-        return item.department.toLowerCase().contains(query);
-      default:
-        return item.nom.toLowerCase().contains(query) ||
-            item.prenom.toLowerCase().contains(query) ||
-            item.email.toLowerCase().contains(query);
-    }
-  }
-  return true;
-}
-
-
-  Widget _materialRowAdmin(MaterialItem m) {
+  Widget _materialRowAdmin(Materiel m) {
     final editable = canEditMaterial(m);
     final removable = canRemoveMaterial(m);
     return Container(
@@ -557,69 +408,19 @@ bool _matchesFilter(dynamic item) {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('ID: ${m.id}', style: const TextStyle(fontWeight: FontWeight.w700)),
             Text('Type: ${m.type}'),
-            Text('Assigned to: ${m.userId.isEmpty ? "-" : m.userId}'),
-            Text('State: ${m.state}'),
-            if (m.os.isNotEmpty) Text('OS: ${m.os}'),
-            if (m.department.isNotEmpty) Text('Department: ${m.department}'),
+            Text('Model: ${m.modele ?? "N/A"}'),
+            Text('State: ${m.etat.name}'),
+            if (m.os != null) Text('OS: ${m.os}'),
           ]),
         ),
         Column(children: [
           ElevatedButton(
-            onPressed: editable
-                ? () {
-                    _matIdController.text = m.id;
-                    _matTypeController.text = m.type;
-                    _matUserIdController.text = m.userId;
-                    _matStateController.text = m.state;
-                    _matOsController.text = m.os;
-                    _matDepartmentController.text = m.department;
-                    showDialog(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: const Text('Edit Material'),
-                        content: SizedBox(
-                          width: 420,
-                          child: Column(mainAxisSize: MainAxisSize.min, children: [
-                            TextField(controller: _matIdController, decoration: const InputDecoration(labelText: 'ID')),
-                            TextField(controller: _matTypeController, decoration: const InputDecoration(labelText: 'Type')),
-                            TextField(controller: _matUserIdController, decoration: const InputDecoration(labelText: 'User ID (assign)')),
-                            TextField(controller: _matStateController, decoration: const InputDecoration(labelText: 'State')),
-                            TextField(controller: _matOsController, decoration: const InputDecoration(labelText: 'OS')),
-                            TextField(controller: _matDepartmentController, decoration: const InputDecoration(labelText: 'Department')),
-                          ]),
-                        ),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                          ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                m.id = _matIdController.text.trim();
-                                m.type = _matTypeController.text.trim();
-                                m.userId = _matUserIdController.text.trim();
-                                m.state = _matStateController.text.trim();
-                                m.os = _matOsController.text.trim();
-                                m.department = _matDepartmentController.text.trim();
-                              });
-                              Navigator.pop(context);
-                            },
-                            child: const Text('Save'),
-                          )
-                        ],
-                      ),
-                    );
-                  }
-                : null,
+            onPressed: editable ? () {} : null,
             child: const Text('Edit'),
           ),
           const SizedBox(height: 6),
           ElevatedButton(
-            onPressed: removable
-                ? () {
-                    setState(() {
-                      materials.remove(m);
-                    });
-                  }
-                : null,
+            onPressed: removable ? () {} : null,
             child: const Text('Remove'),
           ),
         ])
@@ -627,7 +428,7 @@ bool _matchesFilter(dynamic item) {
     );
   }
 
-  Widget _employeeRowAdmin(EmployeeItem e) {
+  Widget _employeeRowAdmin(User e) {
     final editable = canEditEmployee(e);
     final removable = canRemoveEmployee(e);
     return Container(
@@ -637,76 +438,20 @@ bool _matchesFilter(dynamic item) {
       child: Row(children: [
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text('${e.userId} — ${e.nom} ${e.prenom}', style: const TextStyle(fontWeight: FontWeight.w700)),
+            Text('${e.id} — ${e.nom} ${e.prenom}', style: const TextStyle(fontWeight: FontWeight.w700)),
             Text('Email: ${e.email}'),
-            Text('DOB: ${e.dateNaissance}'),
-            Text('Hired: ${e.dateRecrutement}'),
-            if (e.department.isNotEmpty) Text('Department: ${e.department}'),
+            Text('Role: ${e.role.name}'),
+            Text('Active: ${e.actif ? "Yes" : "No"}'),
           ]),
         ),
         Column(children: [
           ElevatedButton(
-            onPressed: editable
-                ? () {
-                    _empUserIdController.text = e.userId;
-                    _empNomController.text = e.nom;
-                    _empPrenomController.text = e.prenom;
-                    _empEmailController.text = e.email;
-                    _empDateNaissanceController.text = e.dateNaissance;
-                    _empDateRecrutementController.text = e.dateRecrutement;
-                    _empDepartmentController.text = e.department;
-                    showDialog(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: const Text('Edit Employee'),
-                        content: SizedBox(
-                          width: 420,
-                          child: Column(mainAxisSize: MainAxisSize.min, children: [
-                            TextField(controller: _empUserIdController, decoration: const InputDecoration(labelText: 'User ID')),
-                            TextField(controller: _empNomController, decoration: const InputDecoration(labelText: 'Nom')),
-                            TextField(controller: _empPrenomController, decoration: const InputDecoration(labelText: 'Prenom')),
-                            TextField(controller: _empEmailController, decoration: const InputDecoration(labelText: 'Email')),
-                            TextField(controller: _empDateNaissanceController, decoration: const InputDecoration(labelText: 'Date de Naissance')),
-                            TextField(controller: _empDateRecrutementController, decoration: const InputDecoration(labelText: 'Date de Recrutement')),
-                            TextField(controller: _empDepartmentController, decoration: const InputDecoration(labelText: 'Department')),
-                          ]),
-                        ),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                          ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                e.userId = _empUserIdController.text.trim();
-                                e.nom = _empNomController.text.trim();
-                                e.prenom = _empPrenomController.text.trim();
-                                e.email = _empEmailController.text.trim();
-                                e.dateNaissance = _empDateNaissanceController.text.trim();
-                                e.dateRecrutement = _empDateRecrutementController.text.trim();
-                                e.department = _empDepartmentController.text.trim();
-                              });
-                              Navigator.pop(context);
-                            },
-                            child: const Text('Save'),
-                          )
-                        ],
-                      ),
-                    );
-                  }
-                : null,
+            onPressed: editable ? () {} : null,
             child: const Text('Edit'),
           ),
           const SizedBox(height: 6),
           ElevatedButton(
-            onPressed: removable
-                ? () {
-                    setState(() {
-                      employees.remove(e);
-                      for (var m in materials) {
-                        if (m.userId == e.userId) m.userId = '';
-                      }
-                    });
-                  }
-                : null,
+            onPressed: removable ? () {} : null,
             child: const Text('Remove'),
           ),
         ])
@@ -723,13 +468,12 @@ bool _matchesFilter(dynamic item) {
           decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFE6E6E6)), borderRadius: BorderRadius.circular(8)),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Department: ${d.nom}', style: const TextStyle(fontWeight: FontWeight.w700)),
-            if (d.description.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(d.description)),
             const SizedBox(height: 8),
             _sectionTitle('Employees'),
-            for (var e in employees.where((ev) => ev.department == d.nom)) Padding(padding: const EdgeInsets.only(top: 6), child: Text('${e.userId} — ${e.nom} ${e.prenom}')),
+            for (var e in employees) Padding(padding: const EdgeInsets.only(top: 6), child: Text('${e.id} — ${e.nom} ${e.prenom}')),
             const SizedBox(height: 8),
             _sectionTitle('Materials'),
-            for (var m in materials.where((mv) => mv.department == d.nom)) Padding(padding: const EdgeInsets.only(top: 6), child: Text('${m.id} — ${m.type} (${m.state})')),
+            for (var m in materials) Padding(padding: const EdgeInsets.only(top: 6), child: Text('${m.id} — ${m.type} (${m.etat.name})')),
           ]),
         )
     ]);
@@ -741,69 +485,14 @@ bool _matchesFilter(dynamic item) {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionTitle('Add New Employee'),
         const SizedBox(height: 12),
-        TextField(controller: _empUserIdController, decoration: const InputDecoration(labelText: 'User ID')),
-        const SizedBox(height: 8),
-        TextField(controller: _empNomController, decoration: const InputDecoration(labelText: 'Nom')),
-        const SizedBox(height: 8),
-        TextField(controller: _empPrenomController, decoration: const InputDecoration(labelText: 'Prenom')),
-        const SizedBox(height: 8),
-        TextField(controller: _empEmailController, decoration: const InputDecoration(labelText: 'Email')),
-        const SizedBox(height: 8),
-        TextField(controller: _empDateRecrutementController, decoration: const InputDecoration(labelText: 'Date de Recrutement (YYYY-MM-DD)')),
-        const SizedBox(height: 8),
-        TextField(controller: _empDateNaissanceController, decoration: const InputDecoration(labelText: 'Date de Naissance (YYYY-MM-DD)')),
-        const SizedBox(height: 8),
-        // For Department users, default department to their own (but they can override)
-        TextField(controller: _empDepartmentController, decoration: InputDecoration(labelText: 'Department', hintText: isDepartementUser ? currentUserDepartment : '')),
+        const Text('This feature is not implemented in this demo version.'),
         const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerRight,
-          child: ElevatedButton(
-            onPressed: () {
-              final deptValue = _empDepartmentController.text.trim();
-              // If department user didn't set anything, auto-fill currentUserDepartment
-              final resolvedDept = deptValue.isEmpty && isDepartementUser ? currentUserDepartment : deptValue;
-              final newEmp = EmployeeItem(
-                userId: _empUserIdController.text.trim(),
-                nom: _empNomController.text.trim(),
-                prenom: _empPrenomController.text.trim(),
-                dateNaissance: _empDateNaissanceController.text.trim(),
-                dateRecrutement: _empDateRecrutementController.text.trim(),
-                email: _empEmailController.text.trim(),
-                department: resolvedDept,
-              );
-
-              // Permission: only Feddi or Department user (adding only in their department) may create employees
-              if (isFeddi) {
-                setState(() {
-                  employees.add(newEmp);
-                });
-              } else if (isDepartementUser) {
-                if (newEmp.department == currentUserDepartment) {
-                  setState(() {
-                    employees.add(newEmp);
-                  });
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Department users can only add employees to their own department.')));
-                  return;
-                }
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You have no permission to add employees.')));
-                return;
-              }
-
-              // Clear
-              _empUserIdController.clear();
-              _empNomController.clear();
-              _empPrenomController.clear();
-              _empEmailController.clear();
-              _empDateNaissanceController.clear();
-              _empDateRecrutementController.clear();
-              _empDepartmentController.clear();
-            },
-            child: const Text('Create'),
-          ),
-        )
+        ElevatedButton(
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Feature not implemented')));
+          },
+          child: const Text('Add Employee (Demo)'),
+        ),
       ]),
     );
   }
@@ -814,64 +503,14 @@ bool _matchesFilter(dynamic item) {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionTitle('Create New Material'),
         const SizedBox(height: 12),
-        TextField(controller: _matIdController, decoration: const InputDecoration(labelText: 'ID')),
-        const SizedBox(height: 8),
-        TextField(controller: _matTypeController, decoration: const InputDecoration(labelText: 'Type')),
-        const SizedBox(height: 8),
-        TextField(controller: _matUserIdController, decoration: const InputDecoration(labelText: 'User ID (optional)')),
-        const SizedBox(height: 8),
-        TextField(controller: _matStateController, decoration: const InputDecoration(labelText: 'State (working / not working)')),
-        const SizedBox(height: 8),
-        TextField(controller: _matOsController, decoration: const InputDecoration(labelText: 'OS')),
-        const SizedBox(height: 8),
-        TextField(controller: _matDepartmentController, decoration: InputDecoration(labelText: 'Department (optional)', hintText: isDepartementUser ? currentUserDepartment : '')),
+        const Text('This feature is not implemented in this demo version.'),
         const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerRight,
-          child: ElevatedButton(
-            onPressed: () {
-              final deptValue = _matDepartmentController.text.trim();
-              final resolvedDept = deptValue.isEmpty && isDepartementUser ? currentUserDepartment : deptValue;
-
-              final newMat = MaterialItem(
-                id: _matIdController.text.trim(),
-                type: _matTypeController.text.trim(),
-                userId: _matUserIdController.text.trim(),
-                state: _matStateController.text.trim(),
-                os: _matOsController.text.trim(),
-                department: resolvedDept,
-              );
-
-              // Permission: Feddi can add any; Department user can add only materials for their department
-              if (isFeddi) {
-                setState(() {
-                  materials.add(newMat);
-                });
-              } else if (isDepartementUser) {
-                if (newMat.department == currentUserDepartment) {
-                  setState(() {
-                    materials.add(newMat);
-                  });
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Department users can only create materials for their own department.')));
-                  return;
-                }
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You have no permission to create materials.')));
-                return;
-              }
-
-              // Clear
-              _matIdController.clear();
-              _matTypeController.clear();
-              _matUserIdController.clear();
-              _matStateController.clear();
-              _matOsController.clear();
-              _matDepartmentController.clear();
-            },
-            child: const Text('Create Material'),
-          ),
-        )
+        ElevatedButton(
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Feature not implemented')));
+          },
+          child: const Text('Create Material (Demo)'),
+        ),
       ]),
     );
   }
@@ -886,97 +525,14 @@ bool _matchesFilter(dynamic item) {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionTitle('Manage Departments (Feddi)'),
         const SizedBox(height: 12),
-        TextField(controller: _deptIdController, decoration: const InputDecoration(labelText: 'Department ID (e.g. D-IT)')),
-        const SizedBox(height: 8),
-        TextField(controller: _deptNameController, decoration: const InputDecoration(labelText: 'Department Name (e.g. IT)')),
-        const SizedBox(height: 8),
-        TextField(controller: _deptDescController, decoration: const InputDecoration(labelText: 'Description')),
+        const Text('This feature is not implemented in this demo version.'),
         const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerRight,
-          child: ElevatedButton(
-            onPressed: () {
-              final id = _deptIdController.text.trim();
-              final name = _deptNameController.text.trim();
-              if (id.isEmpty || name.isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ID and Name required')));
-                return;
-              }
-              setState(() {
-                departments.add(DepartmentItem(id: id, nom: name, description: _deptDescController.text.trim()));
-                _deptIdController.clear();
-                _deptNameController.clear();
-                _deptDescController.clear();
-              });
-            },
-            child: const Text('Create Department'),
-          ),
+        ElevatedButton(
+          onPressed: () {
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Feature not implemented')));
+          },
+          child: const Text('Manage Departments (Demo)'),
         ),
-        const SizedBox(height: 12),
-        _sectionTitle('Existing Departments'),
-        const SizedBox(height: 8),
-        for (var d in departments)
-          Container(
-            margin: const EdgeInsets.only(top: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFE6E6E6)), borderRadius: BorderRadius.circular(8)),
-            child: Row(children: [
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('${d.id} — ${d.nom}', style: const TextStyle(fontWeight: FontWeight.w700)), if (d.description.isNotEmpty) Text(d.description)])),
-              Column(children: [
-                ElevatedButton(
-                  onPressed: () {
-                    _deptIdController.text = d.id;
-                    _deptNameController.text = d.nom;
-                    _deptDescController.text = d.description;
-                    showDialog(
-                      context: context,
-                      builder: (_) => AlertDialog(
-                        title: const Text('Edit Department'),
-                        content: SizedBox(
-                          width: 420,
-                          child: Column(mainAxisSize: MainAxisSize.min, children: [
-                            TextField(controller: _deptIdController, decoration: const InputDecoration(labelText: 'ID')),
-                            TextField(controller: _deptNameController, decoration: const InputDecoration(labelText: 'Name')),
-                            TextField(controller: _deptDescController, decoration: const InputDecoration(labelText: 'Description')),
-                          ]),
-                        ),
-                        actions: [
-                          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-                          ElevatedButton(
-                              onPressed: () {
-                                setState(() {
-                                  d.id = _deptIdController.text.trim();
-                                  d.nom = _deptNameController.text.trim();
-                                  d.description = _deptDescController.text.trim();
-                                });
-                                Navigator.pop(context);
-                              },
-                              child: const Text('Save'))
-                        ],
-                      ),
-                    );
-                  },
-                  child: const Text('Edit'),
-                ),
-                const SizedBox(height: 6),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      departments.remove(d);
-                      // clear references
-                      for (var m in materials) {
-                        if (m.department == d.nom) m.department = '';
-                      }
-                      for (var e in employees) {
-                        if (e.department == d.nom) e.department = '';
-                      }
-                    });
-                  },
-                  child: const Text('Remove'),
-                ),
-              ])
-            ]),
-          )
       ]),
     );
   }
@@ -984,35 +540,33 @@ bool _matchesFilter(dynamic item) {
   // ---------------- Personal info depending on role ----------------
   Widget _personalInfoForRole() {
     if (isFeddi) {
-      // show Feddi-specific info: accepted maintenance tasks etc
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _sectionTitle('Feddi Info'),
         const SizedBox(height: 8),
         const Text('Role: Feddi — maintenance & coordination'),
         const SizedBox(height: 12),
-        _sectionTitle('Accepted maintenance tasks'),
+        _sectionTitle('Available materials'),
         const SizedBox(height: 8),
-        for (var m in feeddiMaintenance) _feddiActionTile(m),
+        for (var m in materials) _materialItem(deviceType: m.type, deviceId: m.id?.toString() ?? '', marque: m.modele ?? '', os: m.etat.name),
       ]);
     } else if (isDepartementUser) {
-      // show department info and materials for that department
       final deptName = currentUserDepartment;
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _personalInfoBoxDepartment(name: deptName),
         const SizedBox(height: 12),
-        _sectionTitle('Materials owned by this department'),
+        _sectionTitle('Materials'),
         const SizedBox(height: 8),
-        for (var m in materials.where((x) => x.department == deptName)) _materialItem(deviceType: m.type, deviceId: m.id, marque: m.os, os: m.state),
+        for (var m in materials) _materialItem(deviceType: m.type, deviceId: m.id?.toString() ?? '', marque: m.modele ?? '', os: m.etat.name),
       ]);
     } else {
-      // normal user
       final sampleUserId = _emailToSampleUserId(widget.loggedInEmail);
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         _personalInfoBoxForEmployee(userId: sampleUserId),
         const SizedBox(height: 12),
         _sectionTitle('Assigned Materials'),
         const SizedBox(height: 8),
-        for (var m in materials.where((x) => x.userId == sampleUserId)) _materialItem(deviceType: m.type, deviceId: m.id, marque: m.os, os: m.state),
+        for (var m in materials.where((x) => x.id.toString() == sampleUserId)) 
+          _materialItem(deviceType: m.type, deviceId: m.id?.toString() ?? '', marque: m.modele ?? '', os: m.etat.name),
       ]);
     }
   }
@@ -1023,12 +577,16 @@ bool _matchesFilter(dynamic item) {
       margin: const EdgeInsets.only(top: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: profileBoxBg, borderRadius: BorderRadius.circular(8)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Department: $name', style: const TextStyle(fontWeight: FontWeight.w700)), const SizedBox(height: 6), Text('This view lists materials and employees assigned to the department ($name).')]),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Department: $name', style: const TextStyle(fontWeight: FontWeight.w700)), 
+        const SizedBox(height: 6), 
+        Text('This view lists materials and employees assigned to the department ($name).')
+      ]),
     );
   }
 
   Widget _personalInfoBoxForEmployee({required String userId}) {
-    final emp = employees.firstWhere((e) => e.userId == userId, orElse: () => EmployeeItem(userId: userId, nom: 'Unknown', prenom: '', dateNaissance: '', dateRecrutement: '', email: '', department: ''));
+    final emp = employees.firstWhere((e) => e.id.toString() == userId, orElse: () => employees.first);
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(top: 8),
@@ -1038,11 +596,10 @@ bool _matchesFilter(dynamic item) {
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Nom: ${emp.nom}', style: const TextStyle(color: textInside, fontSize: 14, fontWeight: FontWeight.w500)),
           Text('Prenom: ${emp.prenom}', style: const TextStyle(color: textInside, fontSize: 14, fontWeight: FontWeight.w500)),
-          if (emp.department.isNotEmpty) Text('Department: ${emp.department}', style: const TextStyle(color: textInside)),
         ]),
         Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Email: ${emp.email}', style: const TextStyle(color: textInside, fontSize: 14, fontWeight: FontWeight.w500)),
-          Text('UserID: ${emp.userId}', style: const TextStyle(color: textInside, fontSize: 14, fontWeight: FontWeight.w500)),
+          Text('ID: ${emp.id}', style: const TextStyle(color: textInside, fontSize: 14, fontWeight: FontWeight.w500)),
         ]),
       ]),
     );
@@ -1062,33 +619,15 @@ bool _matchesFilter(dynamic item) {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFE6E6E6)), borderRadius: BorderRadius.circular(8)),
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('Device Type: $deviceType', style: const TextStyle(color: textInside, fontSize: 14, fontWeight: FontWeight.w500)), Text('ID: $deviceId', style: const TextStyle(color: textInside, fontSize: 14, fontWeight: FontWeight.w500))]),
-        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text('OS: $marque', style: const TextStyle(color: textInside, fontSize: 14, fontWeight: FontWeight.w500)), Text('State: $os', style: const TextStyle(color: textInside, fontSize: 14, fontWeight: FontWeight.w500))]),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Device Type: $deviceType', style: const TextStyle(color: textInside, fontSize: 14, fontWeight: FontWeight.w500)), 
+          Text('ID: $deviceId', style: const TextStyle(color: textInside, fontSize: 14, fontWeight: FontWeight.w500))
+        ]),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Model: $marque', style: const TextStyle(color: textInside, fontSize: 14, fontWeight: FontWeight.w500)), 
+          Text('State: $os', style: const TextStyle(color: textInside, fontSize: 14, fontWeight: FontWeight.w500))
+        ]),
       ]),
-    );
-  }
-
-  Widget _repairHistoryItem({required String deviceType, required String deviceId, required String problemType, required String date}) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFE6E6E6)), borderRadius: BorderRadius.circular(8)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [const Icon(Icons.build, size: 16, color: Colors.black54), const SizedBox(width: 8), Text('$deviceType - $deviceId', style: const TextStyle(color: textOutside, fontSize: 14, fontWeight: FontWeight.w600))]),
-        const SizedBox(height: 8),
-        Row(children: [const SizedBox(width: 24), Expanded(child: Text('Problem: $problemType', style: const TextStyle(color: textInside, fontSize: 14))), Text('Date: $date', style: const TextStyle(color: textInside, fontSize: 14))]),
-      ]),
-    );
-  }
-
-  Widget _maintenanceHistoryItem({required String deviceType, required String deviceId, required String date}) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, border: Border.all(color: const Color(0xFFE6E6E6)), borderRadius: BorderRadius.circular(8)),
-      child: Row(children: [const Icon(Icons.settings, size: 16, color: Colors.black54), const SizedBox(width: 8), Text('$deviceType - $deviceId', style: const TextStyle(color: textOutside, fontSize: 14, fontWeight: FontWeight.w600)), const Spacer(), Text('Date: $date', style: const TextStyle(color: textInside, fontSize: 14))]),
     );
   }
 
