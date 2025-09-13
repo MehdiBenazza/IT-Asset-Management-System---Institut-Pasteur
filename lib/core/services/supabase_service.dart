@@ -1,4 +1,4 @@
-import '../sevices/supabase_client.dart';
+import 'supabase_client.dart';
 
 class SupabaseService {
   // Méthode générique pour récupérer tous les enregistrements d'une table

@@ -1,5 +1,5 @@
 import '../../../../core/services/supabase_service.dart';
-import '../../../../core/sevices/supabase_client.dart';
+import '../../../../core/services/supabase_client.dart';
 import '../../domain/materiel.dart';
 
 abstract class MaterielRemoteDataSource {
@@ -158,6 +158,16 @@ class MaterielRemoteDataSourceImpl implements MaterielRemoteDataSource {
       return data.map((json) => Materiel.fromMap(json)).toList();
     } catch (e) {
       throw Exception('Erreur lors de la récupération des matériels par type: $e');
+    }
+  }
+
+  @override
+  Future<List<Materiel>> getMaterielsByOS(String os) async {
+    try {
+      final data = await SupabaseService.filter(_tableName, {'os': os});
+      return data.map((json) => Materiel.fromMap(json)).toList();
+    } catch (e) {
+      throw Exception('Erreur lors de la récupération des matériels par OS: $e');
     }
   }
 

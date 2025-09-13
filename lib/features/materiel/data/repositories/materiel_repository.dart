@@ -1,6 +1,7 @@
 import '../../domain/materiel.dart';
 import '../datasources/materiel_remote_datasource.dart';
 
+
 abstract class MaterielRepository {
   Future<List<Materiel>> getAllMateriels();
   Future<Materiel?> getMaterielById(int id);
@@ -10,6 +11,7 @@ abstract class MaterielRepository {
   Future<List<Materiel>> searchMateriels(String query);
   Future<List<Materiel>> getMaterielsByEtat(String etat);
   Future<List<Materiel>> getMaterielsByType(String type);
+  Future<List<Materiel>> getMaterielByOS(String os);
   Future<int> getMaterielsCount();
   Future<List<Materiel>> getMaterielsPaginated({int page = 1, int limit = 20});
 }
@@ -111,6 +113,33 @@ class MaterielRepositoryImpl implements MaterielRepository {
       return await _remoteDataSource.getMaterielsCount();
     } catch (e) {
       throw Exception('Erreur repository: Impossible de compter les matériels - $e');
+    }
+  }
+
+  @override
+  Future<List<Materiel>> getMaterielsByOS(String os) async {
+    try {
+      return await _remoteDataSource.getMaterielsByOS(os);
+    } catch (e) {
+      throw Exception('Erreur repository: Impossible de récupérer les matériels par OS - $e');
+    }
+  }
+
+  @override
+  Future<List<Materiel>> getMaterielsByBureau(int bureauId) async {
+    try {
+      return await _remoteDataSource.getMaterielsByBureau(bureauId);
+    } catch (e) {
+      throw Exception('Erreur repository: Impossible de récupérer les matériels par bureau - $e');
+    }
+  }
+
+  @override
+  Future<List<Materiel>> getMaterielsByDepartement(int departementId) async {
+    try {
+      return await _remoteDataSource.getMaterielsByDepartement(departementId);
+    } catch (e) {
+      throw Exception('Erreur repository: Impossible de récupérer les matériels par département - $e');
     }
   }
 

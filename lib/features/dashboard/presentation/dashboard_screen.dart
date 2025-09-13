@@ -346,16 +346,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // ---------------- Database view ----------------
-  Widget _databaseView() {
+// ---------------- Database view ----------------
+Widget _databaseView() {
     // For Feddi: show all materials and employees
-    if (isFeddi) {
-      return _cardWrapper(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _sectionTitle('Data Base (Feddi — full access)'),
-            const SizedBox(height: 12),
+  if (isFeddi) {
+    return _cardWrapper(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _sectionTitle('Data Base (Feddi — full access)'),
+          const SizedBox(height: 12),
             _sectionTitle('Materials'),
             const SizedBox(height: 8),
             for (var m in materials) _materialRowAdmin(m),
@@ -363,35 +363,35 @@ class _DashboardScreenState extends State<DashboardScreen> {
             _sectionTitle('Employees'),
             const SizedBox(height: 8),
             for (var e in employees) _employeeRowAdmin(e),
-          ],
-        ),
-      );
-    }
+        ],
+      ),
+    );
+  }
 
     // Department user: show materials and employees
-    if (isDepartementUser) {
-      final dept = currentUserDepartment;
-      return _cardWrapper(
+  if (isDepartementUser) {
+    final dept = currentUserDepartment;
+    return _cardWrapper(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _sectionTitle('Data Base (Department: $dept)'),
-          const SizedBox(height: 12),
+      _sectionTitle('Data Base (Department: $dept)'),
+      const SizedBox(height: 12),
           _sectionTitle('Materials'),
-          const SizedBox(height: 8),
+      const SizedBox(height: 8),
           for (var m in materials) _materialRowAdmin(m),
-          const SizedBox(height: 12),
+      const SizedBox(height: 12),
           _sectionTitle('Employees'),
-          const SizedBox(height: 8),
+      const SizedBox(height: 8),
           for (var e in employees) _employeeRowAdmin(e),
         ]),
       );
-    }
+  }
 
     // Normal user: show departments overview
-    return _cardWrapper(
+  return _cardWrapper(
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _sectionTitle('Departments Overview'),
-        const SizedBox(height: 8),
-        _departmentOverview(),
+    _sectionTitle('Departments Overview'),
+    const SizedBox(height: 8),
+    _departmentOverview(),
       ]),
     );
   }
@@ -488,7 +488,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const Text('This feature is not implemented in this demo version.'),
         const SizedBox(height: 12),
         ElevatedButton(
-          onPressed: () {
+            onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Feature not implemented')));
           },
           child: const Text('Add Employee (Demo)'),
@@ -506,7 +506,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const Text('This feature is not implemented in this demo version.'),
         const SizedBox(height: 12),
         ElevatedButton(
-          onPressed: () {
+            onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Feature not implemented')));
           },
           child: const Text('Create Material (Demo)'),
@@ -527,8 +527,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         const SizedBox(height: 12),
         const Text('This feature is not implemented in this demo version.'),
         const SizedBox(height: 12),
-        ElevatedButton(
-          onPressed: () {
+                ElevatedButton(
+                  onPressed: () {
             ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Feature not implemented')));
           },
           child: const Text('Manage Departments (Demo)'),

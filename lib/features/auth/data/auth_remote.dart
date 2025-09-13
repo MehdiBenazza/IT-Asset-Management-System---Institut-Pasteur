@@ -1,4 +1,4 @@
-import '../../../core/sevices/supabase_client.dart';
+import '../../../core/services/supabase_client.dart';
 import '../domain/entities.dart';
 
 class AuthRemoteDataSource {
