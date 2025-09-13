@@ -11,6 +11,7 @@ abstract class MaterielRemoteDataSource {
   Future<List<Materiel>> searchMateriels(String query);
   Future<List<Materiel>> getMaterielsByEtat(String etat);
   Future<List<Materiel>> getMaterielsByType(String type);
+  Future<List<Materiel>> getMaterielsByOS(String os);
   Future<int> getMaterielsCount();
   Future<List<Materiel>> getMaterielsPaginated({int page = 1, int limit = 20});
   Future<List<Materiel>> getMaterielsByUser(int userId);

@@ -64,7 +64,7 @@ class _LocalisationFormState extends State<LocalisationForm> {
             value: _bureau,
             decoration: const InputDecoration(labelText: "Bureau"),
             items: widget.bureaux
-                .map((b) => DropdownMenuItem(value: b, child: Text(b.nom ?? '')))
+                .map((b) => DropdownMenuItem(value: b, child: Text(b.nom)))
                 .toList(),
             onChanged: (val) => setState(() => _bureau = val),
             validator: (val) => val == null ? "Choisir un bureau" : null,

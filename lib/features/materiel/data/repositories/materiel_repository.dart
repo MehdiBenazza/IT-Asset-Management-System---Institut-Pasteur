@@ -11,7 +11,9 @@ abstract class MaterielRepository {
   Future<List<Materiel>> searchMateriels(String query);
   Future<List<Materiel>> getMaterielsByEtat(String etat);
   Future<List<Materiel>> getMaterielsByType(String type);
-  Future<List<Materiel>> getMaterielByOS(String os);
+  Future<List<Materiel>> getMaterielsByOS(String os);
+  Future<List<Materiel>> getMaterielsByBureau(int bureauId);
+  Future<List<Materiel>> getMaterielsByDepartement(int departementId);
   Future<int> getMaterielsCount();
   Future<List<Materiel>> getMaterielsPaginated({int page = 1, int limit = 20});
 }

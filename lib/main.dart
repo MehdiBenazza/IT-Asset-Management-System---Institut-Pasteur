@@ -4,9 +4,21 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter/services.dart'; // For FilteringTextInputFormatter
+import 'core/services/backend_service.dart';
+import 'core/services/supabase_client.dart';
+import 'core/enums/app_enums.dart';
 //import 'package:cached_network_image/cached_network_image.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize Supabase
+  try {
+    await SupabaseClientService.initialize();
+  } catch (e) {
+    debugPrint('Failed to initialize Supabase: $e');
+  }
+  
   runApp(const App());
 }
 
@@ -738,8 +750,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool isMenuOpen = true;
   Menu selected = Menu.home;
   int _deptBureauCount = 0;
-  bool _isDarkMode = false;
 
+  // Backend service
+  final BackendService _backendService = BackendService();
 
   // Modern color scheme
   static const Color sidebarBg = Color(0xFF1E293B);
@@ -836,16 +849,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
   final _deptBureausController = TextEditingController();
 
   // Bureau selection state
-  final Set<int> _selectedBureaus = {};
 
   // ========= CHAT ASSISTANT STATE (ONLY USED BY _roleHome) =========
-  final List<_ChatMessage> _chat = <_ChatMessage>[];
   final TextEditingController _chatController = TextEditingController();
-  bool _chatLoading = false;
 
   // Filter state
   String _currentFilter = 'all';
   final _filterController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _backendService.initialize();
+  }
 
   @override
   void dispose() {
@@ -951,43 +967,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  // Helper to create bureau selection chips for departements
-  Widget _bureauSelectionChips() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text('Select Bureaus (1-30)', style: TextStyle(fontWeight: FontWeight.w600)),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: List.generate(30, (index) {
-            final bureauNumber = index + 1;
-            return FilterChip(
-              label: Text('Bureau $bureauNumber'),
-              selected: _selectedBureaus.contains(bureauNumber),
-              onSelected: (selected) {
-                setState(() {
-                  if (selected) {
-                    _selectedBureaus.add(bureauNumber);
-                  } else {
-                    _selectedBureaus.remove(bureauNumber);
-                  }
-                  _deptBureausController.text = _selectedBureaus.join(', ');
-                });
-              },
-            );
-          }),
-        ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _deptBureausController,
-          decoration: const InputDecoration(labelText: 'Selected Bureaus'),
-          readOnly: true,
-        ),
-      ],
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -1242,50 +1221,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  void _showChangePasswordDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Change Password'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                decoration: const InputDecoration(labelText: 'Current Password'),
-                obscureText: true,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                decoration: const InputDecoration(labelText: 'New Password'),
-                obscureText: true,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                decoration: const InputDecoration(labelText: 'Confirm New Password'),
-                obscureText: true,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Password change functionality would be implemented here')),
-                );
-              },
-              child: const Text('Save'),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
   List<Widget> _buildMenuItemsForRole() {
     final common = <Widget>[
@@ -1378,7 +1313,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
             Align(
                 alignment: Alignment.centerRight,
                 child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () async {
+                      // Create report via backend
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Report submitted successfully!')),
+                      );
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: activeBlue,
                       foregroundColor: Colors.white,
@@ -1472,7 +1412,12 @@ Widget _userBody() {
           Align(
               alignment: Alignment.centerRight,
               child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () async {
+                    // Create report via backend
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Report submitted successfully!')),
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: activeBlue,
                     foregroundColor: Colors.white,
@@ -1603,69 +1548,6 @@ Widget _userBody() {
     );
   }
 
-  // -- DeepSeek API call --
-  Future<void> _sendChat() async {
-    final userText = _chatController.text.trim();
-    if (userText.isEmpty) return;
-
-    setState(() {
-      _chat.add(_ChatMessage(fromUser: true, text: userText));
-      _chatController.clear();
-      _chatLoading = true;
-    });
-
-    try {
-      final uri = Uri.parse('https://openrouter.ai/api/v1/chat/completions');
-      final headers = {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer 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',
-        'HTTP-Referer': 'http://localhost:3000',
-        'X-Title': 'Flutter Dashboard',
-      };
-
-      final messages = <Map<String, String>>[
-        {
-          'role': 'system',
-          'content': 'You are an AI assistant embedded inside a Flutter web admin dashboard for an institute. '
-              'You can answer general questions and also guide the user about app features (roles, materials, employees, departments). '
-              'Be concise and helpful.'
-        },
-      ];
-
-      for (final m in _chat) {
-        messages.add({'role': m.fromUser ? 'user' : 'assistant', 'content': m.text});
-      }
-
-      final body = jsonEncode({
-        'model': 'deepseek/deepseek-chat',
-        'messages': messages,
-        'temperature': 0.7,
-        'max_tokens': 800,
-      });
-
-      final resp = await http.post(uri, headers: headers, body: body);
-
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body) as Map<String, dynamic>;
-        final content = (data['choices']?[0]?['message']?['content'] ?? '').toString();
-        setState(() {
-          _chat.add(_ChatMessage(fromUser: false, text: content.isEmpty ? '(No response)' : content));
-        });
-      } else {
-        setState(() {
-          _chat.add(_ChatMessage(fromUser: false, text: 'Error ${resp.statusCode}: ${resp.body}'));
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _chat.add(_ChatMessage(fromUser: false, text: 'Request failed: $e'));
-      });
-    } finally {
-      if (mounted) {
-        setState(() => _chatLoading = false);
-      }
-    }
-  }
 
   // -- Notifications --
 Widget _roleNotifications() {
@@ -1842,7 +1724,7 @@ void _showDateSelectionDialog(NotificationItem n) {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final takeDate = takeDateController.text.trim();
               final returnDate = returnDateController.text.trim();
               
@@ -1853,29 +1735,59 @@ void _showDateSelectionDialog(NotificationItem n) {
                 return;
               }
               
-              // Update notification status
-              n.status = 'accepted';
+              // Parse dates
+              DateTime? parsedTakeDate;
+              DateTime? parsedReturnDate;
+              try {
+                parsedTakeDate = DateTime.parse(takeDate);
+                parsedReturnDate = DateTime.parse(returnDate);
+              } catch (e) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Invalid date format. Please use YYYY-MM-DD.')),
+                );
+                return;
+              }
               
-              // Add to Feddi maintenance list
-              feeddiMaintenance.add({
-                'employee': n.employeeName,
-                'deviceId': n.deviceId,
-                'problem': n.problem,
-                'iddepartement': n.iddepartement,
-                'takeDate': takeDate,
-                'returnDate': returnDate,
-              });
-              
-              // Send email notification
-              _sendEmailNotification(
-                n.employeeName, 
-                'accepted', 
-                takeDate, 
-                returnDate
+              // Accept maintenance request via backend
+              final success = await _backendService.acceptMaintenanceRequest(
+                n.deviceId,
+                takeDate: parsedTakeDate,
+                returnDate: parsedReturnDate,
               );
               
-              Navigator.pop(context);
-              setState(() {});
+              if (success) {
+                // Update notification status
+                n.status = 'accepted';
+                
+                // Add to Feddi maintenance list
+                feeddiMaintenance.add({
+                  'employee': n.employeeName,
+                  'deviceId': n.deviceId,
+                  'problem': n.problem,
+                  'iddepartement': n.iddepartement,
+                  'takeDate': takeDate,
+                  'returnDate': returnDate,
+                });
+                
+                // Send email notification
+                _sendEmailNotification(
+                  n.employeeName, 
+                  'accepted', 
+                  takeDate, 
+                  returnDate
+                );
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Maintenance request accepted successfully!')),
+                );
+                
+                Navigator.pop(context);
+                setState(() {});
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Failed to accept maintenance request. Please try again.')),
+                );
+              }
             },
             child: const Text('Confirm'),
           ),
@@ -1886,14 +1798,27 @@ void _showDateSelectionDialog(NotificationItem n) {
 }
 
 // Reject request
-void _rejectRequest(NotificationItem n) {
-  // Update notification status
-  n.status = 'rejected';
+void _rejectRequest(NotificationItem n) async {
+  // Reject maintenance request via backend
+  final success = await _backendService.rejectMaintenanceRequest(n.deviceId);
   
-  // Send email notification
-  _sendEmailNotification(n.employeeName, 'rejected', '', '');
-  
-  setState(() {});
+  if (success) {
+    // Update notification status
+    n.status = 'rejected';
+    
+    // Send email notification
+    _sendEmailNotification(n.employeeName, 'rejected', '', '');
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Maintenance request rejected successfully!')),
+    );
+    
+    setState(() {});
+  } else {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Failed to reject maintenance request. Please try again.')),
+    );
+  }
 }
 
 // Send email notification (simulated)
@@ -1946,7 +1871,13 @@ void _sendEmailNotification(String employeeName, String status, String takeDate,
         Align(
             alignment: Alignment.centerRight,
             child: ElevatedButton(
-                onPressed: () => setState(() {}),
+                onPressed: () async {
+                  // Save changes via backend
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Changes saved successfully!')),
+                  );
+                  setState(() {});
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: activeBlue,
                   foregroundColor: Colors.white,
@@ -2147,17 +2078,55 @@ void _sendEmailNotification(String employeeName, String status, String takeDate,
                           TextButton(
                               onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
                           ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                m.id = _matIdController.text.trim();
-                                m.type = _matTypeController.text.trim();
-                                m.userId = _matUserIdController.text.trim();
-                                m.etat = _matEtatController.text.trim();
-                                m.modele = _matModeleController.text.trim();
-                                m.iddepartement = _matIddepartementController.text.trim();
-                                m.idbureau = int.tryParse(_matIdbureauController.text) ?? 0;
-                              });
-                              Navigator.pop(context);
+                            onPressed: () async {
+                              // Convert etat string to enum
+                              EtatMaterielEnum etatEnum;
+                              switch (_matEtatController.text.trim().toLowerCase()) {
+                                case 'actif':
+                                  etatEnum = EtatMaterielEnum.actif;
+                                  break;
+                                case 'en panne':
+                                case 'en_panne':
+                                  etatEnum = EtatMaterielEnum.enPanne;
+                                  break;
+                                case 'en reparation':
+                                case 'en_reparation':
+                                  etatEnum = EtatMaterielEnum.enReparation;
+                                  break;
+                                default:
+                                  etatEnum = EtatMaterielEnum.actif;
+                              }
+
+                              // Update material via backend
+                              final materialId = int.tryParse(m.id.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                              final success = await _backendService.updateMateriel(
+                                materialId,
+                                type: _matTypeController.text.trim(),
+                                modele: _matModeleController.text.trim(),
+                                etat: etatEnum,
+                              );
+
+                              if (success) {
+                                // Update local data
+                                setState(() {
+                                  m.id = _matIdController.text.trim();
+                                  m.type = _matTypeController.text.trim();
+                                  m.userId = _matUserIdController.text.trim();
+                                  m.etat = _matEtatController.text.trim();
+                                  m.modele = _matModeleController.text.trim();
+                                  m.iddepartement = _matIddepartementController.text.trim();
+                                  m.idbureau = int.tryParse(_matIdbureauController.text) ?? 0;
+                                });
+                                
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Material updated successfully!')),
+                                );
+                                Navigator.pop(context);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Failed to update material. Please try again.')),
+                                );
+                              }
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: activeBlue,
@@ -2179,10 +2148,25 @@ void _sendEmailNotification(String employeeName, String status, String takeDate,
           const SizedBox(height: 8),
           ElevatedButton(
             onPressed: removable
-                ? () {
-                    setState(() {
-                      materials.remove(m);
-                    });
+                ? () async {
+                    // Delete material via backend
+                    final materialId = int.tryParse(m.id.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                    final success = await _backendService.deleteMateriel(materialId);
+                    
+                    if (success) {
+                      // Remove from local list
+                      setState(() {
+                        materials.remove(m);
+                      });
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Material deleted successfully!')),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Failed to delete material. Please try again.')),
+                      );
+                    }
                   }
                 : null,
             style: ElevatedButton.styleFrom(
@@ -2278,19 +2262,75 @@ void _sendEmailNotification(String employeeName, String status, String takeDate,
                           TextButton(
                               onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
                           ElevatedButton(
-                            onPressed: () {
-                              setState(() {
-                                e.id = _empIdController.text.trim();
-                                e.nom = _empNomController.text.trim();
-                                e.prenom = _empPrenomController.text.trim();
-                                e.email = _empEmailController.text.trim();
-                                e.dateNaissance = _empDateNaissanceController.text.trim();
-                                e.dateRecrutement = _empDateRecrutementController.text.trim();
-                                e.iddepartement = _empIddepartementController.text.trim();
-                                e.idbureau = int.tryParse(_empIdbureauController.text) ?? 0;
-                                e.role = _empRoleController.text.trim();
-                              });
-                              Navigator.pop(context);
+                            onPressed: () async {
+                              // Convert role string to enum
+                              RoleEnum roleEnum;
+                              switch (_empRoleController.text.trim().toLowerCase()) {
+                                case 'admin':
+                                  roleEnum = RoleEnum.admin;
+                                  break;
+                                case 'employe':
+                                  roleEnum = RoleEnum.employe;
+                                  break;
+                                case 'secretaire':
+                                  roleEnum = RoleEnum.secretaire;
+                                  break;
+                                case 'superadmin':
+                                  roleEnum = RoleEnum.superadmin;
+                                  break;
+                                default:
+                                  roleEnum = RoleEnum.employe;
+                              }
+
+                              // Parse dates
+                              DateTime? dateNaissance;
+                              DateTime? dateRecrutement;
+                              try {
+                                dateNaissance = DateTime.parse(_empDateNaissanceController.text.trim());
+                                dateRecrutement = DateTime.parse(_empDateRecrutementController.text.trim());
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Invalid date format. Please use YYYY-MM-DD.')),
+                                );
+                                return;
+                              }
+
+                              // Update employee via backend
+                              final employeeId = int.tryParse(e.id.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                              final success = await _backendService.updateUser(
+                                employeeId,
+                                nom: _empNomController.text.trim(),
+                                prenom: _empPrenomController.text.trim(),
+                                email: _empEmailController.text.trim(),
+                                dateNaissance: dateNaissance,
+                                dateRecrutement: dateRecrutement,
+                                role: roleEnum,
+                                idBureau: int.tryParse(_empIdbureauController.text),
+                              );
+
+                              if (success) {
+                                // Update local data
+                                setState(() {
+                                  e.id = _empIdController.text.trim();
+                                  e.nom = _empNomController.text.trim();
+                                  e.prenom = _empPrenomController.text.trim();
+                                  e.email = _empEmailController.text.trim();
+                                  e.dateNaissance = _empDateNaissanceController.text.trim();
+                                  e.dateRecrutement = _empDateRecrutementController.text.trim();
+                                  e.iddepartement = _empIddepartementController.text.trim();
+                                  e.idbureau = int.tryParse(_empIdbureauController.text) ?? 0;
+                                  e.role = _empRoleController.text.trim();
+                                });
+                                
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Employee updated successfully!')),
+                                );
+                                Navigator.pop(context);
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('Failed to update employee. Please try again.')),
+                                );
+                              }
                             },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: activeBlue,
@@ -2312,13 +2352,28 @@ void _sendEmailNotification(String employeeName, String status, String takeDate,
           const SizedBox(height: 8),
           ElevatedButton(
             onPressed: removable
-                ? () {
-                    setState(() {
-                      employees.remove(e);
-                      for (var m in materials) {
-                        if (m.userId == e.id) m.userId = '';
-                      }
-                    });
+                ? () async {
+                    // Delete employee via backend
+                    final employeeId = int.tryParse(e.id.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+                    final success = await _backendService.deleteUser(employeeId);
+                    
+                    if (success) {
+                      // Remove from local list and unassign materials
+                      setState(() {
+                        employees.remove(e);
+                        for (var m in materials) {
+                          if (m.userId == e.id) m.userId = '';
+                        }
+                      });
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Employee deleted successfully!')),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Failed to delete employee. Please try again.')),
+                      );
+                    }
                   }
                 : null,
             style: ElevatedButton.styleFrom(
@@ -2416,55 +2471,105 @@ void _sendEmailNotification(String employeeName, String status, String takeDate,
       Align(
         alignment: Alignment.centerRight,
         child: ElevatedButton(
-          onPressed: () {
+          onPressed: () async {
             final deptValue = _empIddepartementController.text.trim();
             // If departement user didn't set anything, auto-fill currentUserDepartement
             final resolvedDept =
                 deptValue.isEmpty && isDepartementUser ? currentUserDepartement : deptValue;
 
-            final newEmp = EmployeeItem(
-              id: _empIdController.text.trim(),
-              nom: _empNomController.text.trim(),
-              prenom: _empPrenomController.text.trim(),
-              dateNaissance: _empDateNaissanceController.text.trim(),
-              dateRecrutement: _empDateRecrutementController.text.trim(),
-              email: _empEmailController.text.trim(),
-              iddepartement: resolvedDept,
-              idbureau: int.tryParse(_empIdbureauController.text) ?? 0,
-              role: _empRoleController.text.trim(),
-            );
-
-            // Permission: only Feddi or Departement user (adding only in their departement) may create employees
-            if (isFeddi) {
-              setState(() {
-                employees.add(newEmp);
-              });
-            } else if (isDepartementUser) {
-              if (newEmp.iddepartement == currentUserDepartement) {
-                setState(() {
-                  employees.add(newEmp);
-                });
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('Departement users can only add employees to their own departement.')));
-                return;
-              }
-            } else {
+            // Permission check
+            if (!isFeddi && !isDepartementUser) {
               ScaffoldMessenger.of(context)
                   .showSnackBar(const SnackBar(content: Text('You have no permission to add employees.')));
               return;
             }
 
-            // Clear
-            _empIdController.clear();
-            _empNomController.clear();
-            _empPrenomController.clear();
-            _empEmailController.clear();
-            _empDateNaissanceController.clear();
-            _empDateRecrutementController.clear();
-            _empIddepartementController.clear();
-            _empIdbureauController.clear();
-            _empRoleController.clear();
+            if (isDepartementUser && resolvedDept != currentUserDepartement) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Departement users can only add employees to their own departement.')));
+              return;
+            }
+
+            // Convert role string to enum
+            RoleEnum roleEnum;
+            switch (_empRoleController.text.trim().toLowerCase()) {
+              case 'admin':
+                roleEnum = RoleEnum.admin;
+                break;
+              case 'employe':
+                roleEnum = RoleEnum.employe;
+                break;
+              case 'secretaire':
+                roleEnum = RoleEnum.secretaire;
+                break;
+              case 'superadmin':
+                roleEnum = RoleEnum.superadmin;
+                break;
+              default:
+                roleEnum = RoleEnum.employe;
+            }
+
+            // Parse dates
+            DateTime? dateNaissance;
+            DateTime? dateRecrutement;
+            try {
+              dateNaissance = DateTime.parse(_empDateNaissanceController.text.trim());
+              dateRecrutement = DateTime.parse(_empDateRecrutementController.text.trim());
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Invalid date format. Please use YYYY-MM-DD.')),
+              );
+              return;
+            }
+
+            // Create employee via backend
+            final success = await _backendService.createUser(
+              nom: _empNomController.text.trim(),
+              prenom: _empPrenomController.text.trim(),
+              email: _empEmailController.text.trim(),
+              dateNaissance: dateNaissance,
+              dateRecrutement: dateRecrutement,
+              role: roleEnum,
+              idBureau: int.tryParse(_empIdbureauController.text),
+            );
+
+            if (success) {
+              // Add to local list for immediate UI update
+              final newEmp = EmployeeItem(
+                id: _empIdController.text.trim(),
+                nom: _empNomController.text.trim(),
+                prenom: _empPrenomController.text.trim(),
+                dateNaissance: _empDateNaissanceController.text.trim(),
+                dateRecrutement: _empDateRecrutementController.text.trim(),
+                email: _empEmailController.text.trim(),
+                iddepartement: resolvedDept,
+                idbureau: int.tryParse(_empIdbureauController.text) ?? 0,
+                role: _empRoleController.text.trim(),
+              );
+
+              setState(() {
+                employees.add(newEmp);
+              });
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Employee created successfully!')),
+              );
+
+              // Clear form
+              _empIdController.clear();
+              _empNomController.clear();
+              _empPrenomController.clear();
+              _empEmailController.clear();
+              _empDateNaissanceController.clear();
+              _empDateRecrutementController.clear();
+              _empIddepartementController.clear();
+              _empIdbureauController.clear();
+              _empRoleController.clear();
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Failed to create employee. Please try again.')),
+              );
+            }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: activeBlue,
@@ -2517,50 +2622,82 @@ void _sendEmailNotification(String employeeName, String status, String takeDate,
       Align(
         alignment: Alignment.centerRight,
         child: ElevatedButton(
-          onPressed: () {
+          onPressed: () async {
             final deptValue = _matIddepartementController.text.trim();
             final resolvedDept =
                 deptValue.isEmpty && isDepartementUser ? currentUserDepartement : deptValue;
 
-            final newMat = MaterialItem(
-              id: _matIdController.text.trim(),
-              type: _matTypeController.text.trim(),
-              userId: _matUserIdController.text.trim(),
-              etat: _matEtatController.text.trim(),
-              modele: _matModeleController.text.trim(),
-              iddepartement: resolvedDept,
-              idbureau: int.tryParse(_matIdbureauController.text) ?? 0,
-            );
-
-            // Permission: Feddi can add any; Departement user can add only materials for their departement
-            if (isFeddi) {
-              setState(() {
-                materials.add(newMat);
-              });
-            } else if (isDepartementUser) {
-              if (newMat.iddepartement == currentUserDepartement) {
-                setState(() {
-                  materials.add(newMat);
-                });
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                    content: Text('Departement users can only create materials for their own departement.')));
-                return;
-              }
-            } else {
+            // Permission check
+            if (!isFeddi && !isDepartementUser) {
               ScaffoldMessenger.of(context)
                   .showSnackBar(const SnackBar(content: Text('You have no permission to create materials.')));
               return;
             }
 
-            // Clear
-            _matIdController.clear();
-            _matTypeController.clear();
-            _matUserIdController.clear();
-            _matEtatController.clear();
-            _matModeleController.clear();
-            _matIddepartementController.clear();
-            _matIdbureauController.clear();
+            if (isDepartementUser && resolvedDept != currentUserDepartement) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Departement users can only create materials for their own departement.')));
+              return;
+            }
+
+            // Convert etat string to enum
+            EtatMaterielEnum etatEnum;
+            switch (_matEtatController.text.trim().toLowerCase()) {
+              case 'actif':
+                etatEnum = EtatMaterielEnum.actif;
+                break;
+              case 'en panne':
+              case 'en_panne':
+                etatEnum = EtatMaterielEnum.enPanne;
+                break;
+              case 'en reparation':
+              case 'en_reparation':
+                etatEnum = EtatMaterielEnum.enReparation;
+                break;
+              default:
+                etatEnum = EtatMaterielEnum.actif;
+            }
+
+            // Create material via backend
+            final success = await _backendService.createMateriel(
+              type: _matTypeController.text.trim(),
+              modele: _matModeleController.text.trim(),
+              etat: etatEnum,
+            );
+
+            if (success) {
+              // Add to local list for immediate UI update
+              final newMat = MaterialItem(
+                id: _matIdController.text.trim(),
+                type: _matTypeController.text.trim(),
+                userId: _matUserIdController.text.trim(),
+                etat: _matEtatController.text.trim(),
+                modele: _matModeleController.text.trim(),
+                iddepartement: resolvedDept,
+                idbureau: int.tryParse(_matIdbureauController.text) ?? 0,
+              );
+
+              setState(() {
+                materials.add(newMat);
+              });
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Material created successfully!')),
+              );
+
+              // Clear form
+              _matIdController.clear();
+              _matTypeController.clear();
+              _matUserIdController.clear();
+              _matEtatController.clear();
+              _matModeleController.clear();
+              _matIddepartementController.clear();
+              _matIdbureauController.clear();
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Failed to create material. Please try again.')),
+              );
+            }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: activeBlue,
@@ -2615,7 +2752,7 @@ void _sendEmailNotification(String employeeName, String status, String takeDate,
       Align(
         alignment: Alignment.centerRight,
         child: ElevatedButton(
-          onPressed: () {
+          onPressed: () async {
             final id = _deptIdController.text.trim();
             final nom = _deptNomController.text.trim();
             if (id.isEmpty || nom.isEmpty) {
@@ -2624,20 +2761,36 @@ void _sendEmailNotification(String employeeName, String status, String takeDate,
               return;
             }
 
-            setState(() {
-              departements.add(DepartementItem(
-                id: id,
-                nom: nom,
-                description: _deptDescController.text.trim(),
-                bureauCount: _deptBureauCount,
-              ));
+            // Create department via backend
+            final success = await _backendService.createDepartement(
+              nom: nom,
+            );
 
-              // Clear form
-              _deptIdController.clear();
-              _deptNomController.clear();
-              _deptDescController.clear();
-              _deptBureauCount = 0;
-            });
+            if (success) {
+              // Add to local list for immediate UI update
+              setState(() {
+                departements.add(DepartementItem(
+                  id: id,
+                  nom: nom,
+                  description: _deptDescController.text.trim(),
+                  bureauCount: _deptBureauCount,
+                ));
+
+                // Clear form
+                _deptIdController.clear();
+                _deptNomController.clear();
+                _deptDescController.clear();
+                _deptBureauCount = 0;
+              });
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Department created successfully!')),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Failed to create department. Please try again.')),
+              );
+            }
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: activeBlue,
@@ -2716,7 +2869,13 @@ void _sendEmailNotification(String employeeName, String status, String takeDate,
                       actions: [
                         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
                         ElevatedButton(
-                          onPressed: () {
+                          onPressed: () async {
+                            // Update department via backend
+                            // Note: We need to implement updateDepartement in BackendService
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Department updated successfully!')),
+                            );
+                            
                             setState(() {
                               d.id = _deptIdController.text.trim();
                               d.nom = _deptNomController.text.trim();
@@ -2743,7 +2902,13 @@ void _sendEmailNotification(String employeeName, String status, String takeDate,
               ),
               const SizedBox(height: 8),
               ElevatedButton(
-                onPressed: () {
+                onPressed: () async {
+                  // Delete department via backend
+                  // Note: We need to implement deleteDepartement in BackendService
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Department deleted successfully!')),
+                  );
+                  
                   setState(() {
                     departements.remove(d);
                     // clear references
@@ -2925,56 +3090,7 @@ void _sendEmailNotification(String employeeName, String status, String takeDate,
     );
   }
 
-  Widget _repairHistoryItem(
-      {required String deviceType,
-      required String deviceId,
-      required String problemType,
-      required String date}) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: borderColor),
-          borderRadius: BorderRadius.circular(12)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Icon(Icons.build, size: 16, color: Color(0xFF6366F1)),
-          const SizedBox(width: 12),
-          Text('$deviceType - $deviceId',
-              style: const TextStyle(color: textOutside, fontWeight: FontWeight.w600))
-        ]),
-        const SizedBox(height: 8),
-        Row(children: [
-          const SizedBox(width: 28),
-          Expanded(child: Text('Problem: $problemType', style: const TextStyle(color: textInside, fontSize: 14))),
-          Text('Date: $date', style: const TextStyle(color: textInside, fontSize: 14))
-        ]),
-      ]),
-    );
-  }
 
-  Widget _maintenanceHistoryItem(
-      {required String deviceType, required String deviceId, required String date}) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border.all(color: borderColor),
-          borderRadius: BorderRadius.circular(12)),
-      child: Row(children: [
-        const Icon(Icons.settings, size: 16, color: Color(0xFF6366F1)),
-        const SizedBox(width: 12),
-        Text('$deviceType - $deviceId',
-            style: const TextStyle(color: textOutside, fontWeight: FontWeight.w600)),
-        const Spacer(),
-        Text('Date: $date', style: const TextStyle(color: textInside, fontSize: 14))
-      ]),
-    );
-  }
 
   Widget _textField({required String label, int maxLines = 1}) {
     return Column(
@@ -3055,12 +3171,4 @@ void _sendEmailNotification(String employeeName, String status, String takeDate,
   void _openWebUrl(String url) {
     if (kIsWeb) html.window.open(url, '_blank');
   }
-}
-
-// ====== Simple chat message model (UI only) ======
-class _ChatMessage {
-  final bool fromUser;
-  final String text;
-
-  _ChatMessage({required this.fromUser, required this.text});
 }

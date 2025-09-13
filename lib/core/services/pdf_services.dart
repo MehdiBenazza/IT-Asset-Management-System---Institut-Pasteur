@@ -1,8 +1,6 @@
 import 'dart:typed_data';
-import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:share_plus/share_plus.dart';
 
 class PdfService {
 	/// Crée un PDF à partir d'un titre et d'un contenu
@@ -26,7 +24,7 @@ class PdfService {
 	/// Partage un PDF (Uint8List) via les options natives
 	Future<void> sharePdf(Uint8List pdfBytes, {String? fileName}) async {
 		final name = fileName ?? 'document.pdf';
-		final tempDir = await Printing.sharePdf(bytes: pdfBytes, filename: name);
+		await Printing.sharePdf(bytes: pdfBytes, filename: name);
 		// Optionnel: Utiliser Share.shareXFiles pour partager le fichier si besoin
 	}
 
